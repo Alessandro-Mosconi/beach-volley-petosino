@@ -83,29 +83,6 @@ export default function Agenda({ teamId, teams }: AgendaProps) {
       setLoading(false);
     }
     fetchAgenda();
-
-    const channel = supabase
-      .channel(`agenda-live-${teamId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'partita' },
-        () => fetchAgenda()
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'campo' },
-        () => fetchAgenda()
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'squadra' },
-        () => fetchAgenda()
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, [teamId]);
 
   const formatDateTime = (isoString: string) => {
@@ -130,14 +107,12 @@ export default function Agenda({ teamId, teams }: AgendaProps) {
           {events.map((e) => (
             <li
               key={e.id}
-              className={`agenda-event-card ${
-                e.role === 'referee' ? 'agenda-event-card-referee' : 'agenda-event-card-player'
-              }`}
               style={{
                 border: '1px solid #ccc',
                 borderRadius: '4px',
                 padding: '0.75rem',
-                marginBottom: '0.5rem'
+                marginBottom: '0.5rem',
+                backgroundColor: e.role === 'referee' ? '#f9e7a1' : '#bfe3c0'
               }}
             >
               <div>

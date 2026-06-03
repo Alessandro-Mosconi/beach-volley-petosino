@@ -15,11 +15,42 @@ interface Team {
 type View = 'agenda' | 'classifica' | 'gold' | 'silver' | 'stats' | 'info_service';
 
 function viewFromPath(pathname: string): View {
-  return pathname === '/info_service' ? 'info_service' : 'agenda';
+  switch (pathname) {
+    case '/':
+    case '/agenda':
+      return 'agenda';
+    case '/classifica':
+      return 'classifica';
+    case '/gold':
+      return 'gold';
+    case '/silver':
+      return 'silver';
+    case '/stats':
+      return 'stats';
+    case '/info_service':
+      return 'info_service';
+    default:
+      return 'agenda';
+  }
 }
 
 function pathFromView(view: View): string {
-  return view === 'info_service' ? '/info_service' : '/';
+  switch (view) {
+    case 'agenda':
+      return '/';
+    case 'classifica':
+      return '/classifica';
+    case 'gold':
+      return '/gold';
+    case 'silver':
+      return '/silver';
+    case 'stats':
+      return '/stats';
+    case 'info_service':
+      return '/info_service';
+    default:
+      return '/';
+  }
 }
 
 export default function App() {
@@ -27,7 +58,7 @@ export default function App() {
   const [selectedTeam, setSelectedTeam] = useState<number | null>(null);
   const [view, setView] = useState<View>(viewFromPath(window.location.pathname));
   const [loading, setLoading] = useState<boolean>(true);
-  const [teamsError, setTeamsError] = useState<string | null>(null);
+  const [teamsLoadError, setTeamsLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     const onPopState = () => {
@@ -56,7 +87,7 @@ export default function App() {
         setTeams(data as Team[]);
         if (data.length > 0) setSelectedTeam(data[0].id);
       } else {
-        setTeamsError(error?.message ?? 'Errore sconosciuto');
+        setTeamsLoadError(error?.message ?? 'Errore sconosciuto');
       }
       setLoading(false);
     }
@@ -118,7 +149,7 @@ export default function App() {
         {teams.length === 0 && view !== 'info_service' && (
           <p>
             Nessuna squadra disponibile.
-            {teamsError ? ` Errore Supabase: ${teamsError}` : ''}
+            {teamsLoadError ? ` Errore Supabase: ${teamsLoadError}` : ''}
           </p>
         )}
         {view === 'agenda' && selectedTeam && (

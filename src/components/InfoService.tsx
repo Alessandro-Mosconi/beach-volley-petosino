@@ -26,29 +26,32 @@ export default function InfoService() {
 
     const networkOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
 
-    let supabaseStatus: CheckResult = {
-      name: 'Connessione Supabase',
-      status: 'error',
-      details: 'Connessione non riuscita'
-    };
-
     const startedAt = Date.now();
-    const { error } = await supabase.from('squadra').select('id', { count: 'exact', head: true });
+    const supabaseResult = await Promise.race([
+      supabase
+        .from('squadra')
+        .select('id', { count: 'exact', head: true })
+        .then(({ error }) => ({
+          ok: !error,
+          message: error?.message ?? ''
+        })),
+      new Promise<{ ok: false; message: string }>((resolve) =>
+        setTimeout(() => resolve({ ok: false, message: 'Timeout risposta Supabase (8s)' }), 8000)
+      )
+    ]);
     const elapsedMs = Date.now() - startedAt;
 
-    if (!error) {
-      supabaseStatus = {
-        name: 'Connessione Supabase',
-        status: 'ok',
-        details: `Connessione riuscita (${elapsedMs} ms)`
-      };
-    } else {
-      supabaseStatus = {
-        name: 'Connessione Supabase',
-        status: 'error',
-        details: `Errore: ${error.message}`
-      };
-    }
+    const supabaseStatus: CheckResult = supabaseResult.ok
+      ? {
+          name: 'Connessione Supabase',
+          status: 'ok',
+          details: `Connessione riuscita (${elapsedMs} ms)`
+        }
+      : {
+          name: 'Connessione Supabase',
+          status: 'error',
+          details: `Errore: ${supabaseResult.message}`
+        };
 
     const envStatus: CheckResult = {
       name: 'Configurazione variabili ambiente',

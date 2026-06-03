@@ -99,10 +99,12 @@ export default function App() {
   }
 
   return (
-    <div style={{ padding: '1rem', fontFamily: 'Arial, sans-serif' }}>
-      <h1>Torneo Beach Volley</h1>
+    <div className="app-shell">
+      <header className="app-header">
+        <h1>Torneo Beach Volley</h1>
+      </header>
       {teams.length > 0 && (
-        <label>
+        <label className="team-select">
           Seleziona squadra:{' '}
           <select
             value={selectedTeam ?? undefined}
@@ -117,14 +119,7 @@ export default function App() {
         </label>
       )}
       {/* Navigation */}
-      <nav
-        style={{
-          marginTop: '1rem',
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '0.5rem'
-        }}
-      >
+      <nav className="tab-nav">
         <button onClick={() => goToView('agenda')} disabled={view === 'agenda'}>
           Agenda
         </button>
@@ -140,12 +135,9 @@ export default function App() {
         <button onClick={() => goToView('stats')} disabled={view === 'stats'}>
           Statistiche Squadra
         </button>
-        <button onClick={() => goToView('info_service')} disabled={view === 'info_service'}>
-          Info Service
-        </button>
       </nav>
       {/* Render chosen view */}
-      <div style={{ marginTop: '1.5rem' }}>
+      <div className="section-panel">
         {teams.length === 0 && view !== 'info_service' && (
           <p>
             Nessuna squadra disponibile.

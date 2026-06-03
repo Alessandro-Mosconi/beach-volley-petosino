@@ -60,6 +60,29 @@ export default function TeamStats({ teamId, teams }: TeamStatsProps) {
       setLoading(false);
     }
     fetchStats();
+
+    const channel = supabase
+      .channel(`stats-live-${teamId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'classifica' },
+        () => fetchStats()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'girone' },
+        () => fetchStats()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'fase_torneo' },
+        () => fetchStats()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [teamId]);
 
   return (
@@ -70,38 +93,45 @@ export default function TeamStats({ teamId, teams }: TeamStatsProps) {
       ) : stats.length === 0 ? (
         <p>Nessuna statistica disponibile per questa squadra.</p>
       ) : (
-        <table
-          style={{ width: '100%', borderCollapse: 'collapse', marginTop: '0.5rem' }}
-        >
-          <thead>
-            <tr>
-              <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Fase</th>
-              <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Girone</th>
-              <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Pos</th>
-              <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>PG</th>
-              <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>V</th>
-              <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>P</th>
-              <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Set V/P</th>
-              <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Punti</th>
-            </tr>
-          </thead>
-          <tbody>
-            {stats.map((row, idx) => (
-              <tr key={idx}>
-                <td style={{ padding: '0.25rem' }}>{row.fase_nome}</td>
-                <td style={{ padding: '0.25rem' }}>{row.girone_nome ?? '-'}</td>
-                <td style={{ padding: '0.25rem' }}>{row.posizione}</td>
-                <td style={{ padding: '0.25rem' }}>{row.partite_giocate}</td>
-                <td style={{ padding: '0.25rem' }}>{row.partite_vinte}</td>
-                <td style={{ padding: '0.25rem' }}>{row.partite_perse}</td>
-                <td style={{ padding: '0.25rem' }}>
-                  {row.set_vinti} / {row.set_persi}
-                </td>
-                <td style={{ padding: '0.25rem' }}>{row.punti_classifica}</td>
+        <div style={{ overflowX: 'auto' }}>
+          <table
+            style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              marginTop: '0.5rem',
+              minWidth: '640px'
+            }}
+          >
+            <thead>
+              <tr>
+                <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Fase</th>
+                <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Girone</th>
+                <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Pos</th>
+                <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>PG</th>
+                <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>V</th>
+                <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>P</th>
+                <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Set V/P</th>
+                <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Punti</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {stats.map((row, idx) => (
+                <tr key={idx}>
+                  <td style={{ padding: '0.25rem' }}>{row.fase_nome}</td>
+                  <td style={{ padding: '0.25rem' }}>{row.girone_nome ?? '-'}</td>
+                  <td style={{ padding: '0.25rem' }}>{row.posizione}</td>
+                  <td style={{ padding: '0.25rem' }}>{row.partite_giocate}</td>
+                  <td style={{ padding: '0.25rem' }}>{row.partite_vinte}</td>
+                  <td style={{ padding: '0.25rem' }}>{row.partite_perse}</td>
+                  <td style={{ padding: '0.25rem' }}>
+                    {row.set_vinti} / {row.set_persi}
+                  </td>
+                  <td style={{ padding: '0.25rem' }}>{row.punti_classifica}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

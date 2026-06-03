@@ -90,40 +90,43 @@ export default function Classifica({ faseName }: ClassificaProps) {
         Object.keys(groups).map((gironeNome) => (
           <div key={gironeNome} style={{ marginBottom: '1.5rem' }}>
             <h3>Girone {gironeNome}</h3>
-            <table
-              style={{
-                width: '100%',
-                borderCollapse: 'collapse',
-                marginTop: '0.5rem'
-              }}
-            >
-              <thead>
-                <tr>
-                  <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Pos</th>
-                  <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Squadra</th>
-                  <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>PG</th>
-                  <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Vinte</th>
-                  <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Perse</th>
-                  <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Set V/P</th>
-                  <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Punti</th>
-                </tr>
-              </thead>
-              <tbody>
-                {groups[gironeNome].map((row) => (
-                  <tr key={row.squadra_id}>
-                    <td style={{ padding: '0.25rem' }}>{row.posizione}</td>
-                    <td style={{ padding: '0.25rem' }}>{row.squadra_nome}</td>
-                    <td style={{ padding: '0.25rem' }}>{row.partite_giocate}</td>
-                    <td style={{ padding: '0.25rem' }}>{row.partite_vinte}</td>
-                    <td style={{ padding: '0.25rem' }}>{row.partite_perse}</td>
-                    <td style={{ padding: '0.25rem' }}>
-                      {row.set_vinti} / {row.set_persi}
-                    </td>
-                    <td style={{ padding: '0.25rem' }}>{row.punti_classifica}</td>
+            <div style={{ overflowX: 'auto' }}>
+              <table
+                style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  marginTop: '0.5rem',
+                  minWidth: '580px'
+                }}
+              >
+                <thead>
+                  <tr>
+                    <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Pos</th>
+                    <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Squadra</th>
+                    <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>PG</th>
+                    <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Vinte</th>
+                    <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Perse</th>
+                    <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Set V/P</th>
+                    <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Punti</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {groups[gironeNome].map((row) => (
+                    <tr key={row.squadra_id}>
+                      <td style={{ padding: '0.25rem' }}>{row.posizione}</td>
+                      <td style={{ padding: '0.25rem' }}>{row.squadra_nome}</td>
+                      <td style={{ padding: '0.25rem' }}>{row.partite_giocate}</td>
+                      <td style={{ padding: '0.25rem' }}>{row.partite_vinte}</td>
+                      <td style={{ padding: '0.25rem' }}>{row.partite_perse}</td>
+                      <td style={{ padding: '0.25rem' }}>
+                        {row.set_vinti} / {row.set_persi}
+                      </td>
+                      <td style={{ padding: '0.25rem' }}>{row.punti_classifica}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         ))
       )}

@@ -13,6 +13,7 @@ interface Team {
 }
 
 type View = 'agenda' | 'classifica' | 'gold' | 'silver' | 'stats' | 'info_service';
+type Theme = 'dark' | 'light';
 
 function viewFromPath(pathname: string): View {
   switch (pathname) {
@@ -59,6 +60,10 @@ export default function App() {
   const [view, setView] = useState<View>(viewFromPath(window.location.pathname));
   const [loading, setLoading] = useState<boolean>(true);
   const [teamsLoadError, setTeamsLoadError] = useState<string | null>(null);
+  const [theme, setTheme] = useState<Theme>(() => {
+    const storedTheme = window.localStorage.getItem('theme');
+    return storedTheme === 'light' ? 'light' : 'dark';
+  });
 
   useEffect(() => {
     const onPopState = () => {
@@ -67,6 +72,11 @@ export default function App() {
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    window.localStorage.setItem('theme', theme);
+  }, [theme]);
 
   const goToView = (nextView: View) => {
     setView(nextView);
@@ -123,6 +133,9 @@ export default function App() {
     <div className="app-shell">
       <header className="app-header">
         <h1>Torneo Beach Volley</h1>
+        <button className="theme-toggle" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+          {theme === 'dark' ? 'Tema chiaro' : 'Tema scuro'}
+        </button>
       </header>
       {teams.length > 0 && (
         <label className="team-select">

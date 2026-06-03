@@ -130,12 +130,14 @@ export default function Agenda({ teamId, teams }: AgendaProps) {
           {events.map((e) => (
             <li
               key={e.id}
+              className={`agenda-event-card ${
+                e.role === 'referee' ? 'agenda-event-card-referee' : 'agenda-event-card-player'
+              }`}
               style={{
                 border: '1px solid #ccc',
                 borderRadius: '4px',
                 padding: '0.75rem',
-                marginBottom: '0.5rem',
-                backgroundColor: e.role === 'referee' ? '#f9e7a1' : '#bfe3c0'
+                marginBottom: '0.5rem'
               }}
             >
               <div>

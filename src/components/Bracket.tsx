@@ -7,7 +7,7 @@ interface BracketProps {
 
 interface MatchData {
   id: number;
-  numero_partita: number | null;
+  numero_partita: number;
   squadra_1_id: number | null;
   squadra_2_id: number | null;
   squadra_1_nome: string;
@@ -15,8 +15,15 @@ interface MatchData {
   setWins1: number;
   setWins2: number;
   winner: number | null;
-  isPlaceholder?: boolean;
+  orario_inizio: string | null;
+  campo_nome: string;
 }
+
+const BRACKET_STRUCTURE = [
+  { title: 'Quarti', matchNumbers: [1, 2, 3, 4] },
+  { title: 'Semifinali', matchNumbers: [5, 6] },
+  { title: 'Finale', matchNumbers: [7] }
+];
 
 export default function Bracket({ faseName }: BracketProps) {
   const [matches, setMatches] = useState<MatchData[]>([]);
@@ -40,9 +47,7 @@ export default function Bracket({ faseName }: BracketProps) {
       // Fetch matches in this phase
       const { data: partite, error: partitaErr } = await supabase
         .from('partita')
-        .select(
-          'id, numero_partita, squadra_1_id, squadra_2_id'
-        )
+        .select('id, numero_partita, squadra_1_id, squadra_2_id, orario_inizio, campo_id')
         .eq('fase_torneo_id', faseId)
         .order('numero_partita', { ascending: true });
       if (partitaErr || !partite) {
@@ -50,20 +55,36 @@ export default function Bracket({ faseName }: BracketProps) {
         setLoading(false);
         return;
       }
-      // Fetch team names
-      const { data: squadre } = await supabase
-        .from('squadra')
-        .select('id, nome');
+
+      const [squadreRes, campiRes] = await Promise.all([
+        supabase.from('squadra').select('id, nome'),
+        supabase.from('campo').select('id, nome')
+      ]);
+
+      const squadre = squadreRes.data;
+      const campi = campiRes.data;
       const squadraMap = new Map<number, string>();
       squadre?.forEach((s) => squadraMap.set(s.id, s.nome));
-      // For each match, fetch sets to determine winner
+
+      const campoMap = new Map<number, string>();
+      campi?.forEach((c) => campoMap.set(c.id, c.nome));
+
+      const partitaIds = partite.map((p) => p.id);
+      const { data: allSets } = await supabase
+        .from('partita_set')
+        .select('partita_id, punteggio_squadra_1, punteggio_squadra_2')
+        .in('partita_id', partitaIds);
+
+      const setsByMatch = new Map<number, { punteggio_squadra_1: number; punteggio_squadra_2: number }[]>();
+      allSets?.forEach((set) => {
+        const list = setsByMatch.get(set.partita_id) ?? [];
+        list.push(set);
+        setsByMatch.set(set.partita_id, list);
+      });
+
       const matchData: MatchData[] = [];
       for (const partita of partite) {
-        // Fetch sets
-        const { data: sets } = await supabase
-          .from('partita_set')
-          .select('punteggio_squadra_1, punteggio_squadra_2')
-          .eq('partita_id', partita.id);
+        const sets = setsByMatch.get(partita.id) ?? [];
         let setWins1 = 0;
         let setWins2 = 0;
         sets?.forEach((set) => {
@@ -78,17 +99,20 @@ export default function Bracket({ faseName }: BracketProps) {
         else if (setWins2 > setWins1) winner = partita.squadra_2_id;
         matchData.push({
           id: partita.id,
-          numero_partita: partita.numero_partita,
+          numero_partita: partita.numero_partita ?? 0,
           squadra_1_id: partita.squadra_1_id,
           squadra_2_id: partita.squadra_2_id,
           squadra_1_nome: squadraMap.get(partita.squadra_1_id) ?? '',
           squadra_2_nome: squadraMap.get(partita.squadra_2_id) ?? '',
           setWins1,
           setWins2,
-          winner
+          winner,
+          orario_inizio: partita.orario_inizio ?? null,
+          campo_nome: campoMap.get(partita.campo_id) ?? ''
         });
       }
-      setMatches(matchData);
+
+      setMatches(matchData.filter((m) => m.numero_partita > 0));
       setLoading(false);
     }
     fetchMatches();
@@ -115,6 +139,11 @@ export default function Bracket({ faseName }: BracketProps) {
         { event: '*', schema: 'public', table: 'squadra' },
         () => fetchMatches()
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'campo' },
+        () => fetchMatches()
+      )
       .subscribe();
 
     return () => {
@@ -122,8 +151,8 @@ export default function Bracket({ faseName }: BracketProps) {
     };
   }, [faseName]);
 
-  const emptyBracket: MatchData[] = Array.from({ length: 4 }, (_, index) => ({
-    id: -1 - index,
+  const emptyBracket: MatchData[] = Array.from({ length: 7 }, (_, index) => ({
+    id: -100 - index,
     numero_partita: index + 1,
     squadra_1_id: null,
     squadra_2_id: null,
@@ -132,10 +161,26 @@ export default function Bracket({ faseName }: BracketProps) {
     setWins1: 0,
     setWins2: 0,
     winner: null,
-    isPlaceholder: true
+    orario_inizio: null,
+    campo_nome: ''
   }));
 
-  const matchesToRender = matches.length > 0 ? matches : emptyBracket;
+  const matchesByNumber = new Map<number, MatchData>();
+  (matches.length > 0 ? matches : emptyBracket).forEach((match) => {
+    matchesByNumber.set(match.numero_partita, match);
+  });
+
+  const findWinnerFallback = (matchNumber: number) => {
+    if (matchNumber === 5) return ['Vincente Quarto 1', 'Vincente Quarto 2'];
+    if (matchNumber === 6) return ['Vincente Quarto 3', 'Vincente Quarto 4'];
+    if (matchNumber === 7) return ['Vincente Semifinale 1', 'Vincente Semifinale 2'];
+    return ['Da definire', 'Da definire'];
+  };
+
+  const formatDateTime = (value: string | null) => {
+    if (!value) return 'Orario da definire';
+    return new Date(value).toLocaleString('it-IT', { timeZone: 'Europe/Rome' });
+  };
 
   return (
     <div>
@@ -146,35 +191,49 @@ export default function Bracket({ faseName }: BracketProps) {
         <>
           {matches.length === 0 && (
             <p style={{ marginTop: 0, opacity: 0.8 }}>
-              Bracket non ancora popolato: visualizzazione vuota.
+              Nessuna squadra ancora assegnata: bracket vuoto visibile.
             </p>
           )}
-          <ul style={{ listStyle: 'none', padding: 0 }}>
-            {matchesToRender.map((m) => (
-            <li
-              key={m.id}
-              style={{
-                border: '1px solid #ccc',
-                borderRadius: '4px',
-                padding: '0.75rem',
-                marginBottom: '0.5rem'
-              }}
-            >
-              <div>
-                <strong>
-                  {m.numero_partita ? `Partita ${m.numero_partita}: ` : ''}
-                  {m.squadra_1_nome || 'Da definire'} {m.isPlaceholder ? '-' : m.setWins1} -{' '}
-                  {m.isPlaceholder ? '-' : m.setWins2} {m.squadra_2_nome || 'Da definire'}
-                </strong>
+          <div className="bracket-tree">
+            {BRACKET_STRUCTURE.map((round) => (
+              <div key={round.title} className="bracket-round">
+                <h3>{round.title}</h3>
+                {round.matchNumbers.map((matchNumber) => {
+                  const match = matchesByNumber.get(matchNumber) ?? emptyBracket[matchNumber - 1];
+                  const [fallbackA, fallbackB] = findWinnerFallback(matchNumber);
+                  const teamA = match.squadra_1_nome || fallbackA;
+                  const teamB = match.squadra_2_nome || fallbackB;
+                  const showScore = Boolean(match.squadra_1_nome && match.squadra_2_nome);
+                  return (
+                    <div key={matchNumber} className="bracket-match-card">
+                      <div>
+                        <strong>Partita {matchNumber}</strong>
+                      </div>
+                      <div className="bracket-meta">{formatDateTime(match.orario_inizio)}</div>
+                      <div className="bracket-meta">
+                        {match.campo_nome ? `Campo: ${match.campo_nome}` : 'Campo da definire'}
+                      </div>
+                      <div className="bracket-team-line">
+                        {teamA} {showScore ? match.setWins1 : '-'}
+                      </div>
+                      <div className="bracket-team-line">
+                        {teamB} {showScore ? match.setWins2 : '-'}
+                      </div>
+                      <div className="bracket-meta">
+                        Risultato: {showScore ? `${match.setWins1}-${match.setWins2}` : 'in attesa'}
+                      </div>
+                      {match.winner && (
+                        <div className="bracket-winner">
+                          Vincente:{' '}
+                          <em>{match.winner === match.squadra_1_id ? match.squadra_1_nome : match.squadra_2_nome}</em>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-              {m.winner && !m.isPlaceholder && (
-                <div>
-                  Vincitore: <em>{m.winner === m.squadra_1_id ? m.squadra_1_nome : m.squadra_2_nome}</em>
-                </div>
-              )}
-            </li>
-          ))}
-          </ul>
+            ))}
+          </div>
         </>
       )}
     </div>

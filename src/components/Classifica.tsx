@@ -127,6 +127,34 @@ export default function Classifica({ faseName }: ClassificaProps) {
       setLoading(false);
     }
     fetchData();
+
+    const channel = supabase
+      .channel(`classifica-live-${faseName}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'classifica' },
+        () => fetchData()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'girone_squadra' },
+        () => fetchData()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'girone' },
+        () => fetchData()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'squadra' },
+        () => fetchData()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [faseName]);
 
   // Group rows by girone

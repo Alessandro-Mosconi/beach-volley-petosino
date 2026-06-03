@@ -7,13 +7,15 @@ interface BracketProps {
 
 interface MatchData {
   id: number;
-  squadra_1_id: number;
-  squadra_2_id: number;
+  numero_partita: number | null;
+  squadra_1_id: number | null;
+  squadra_2_id: number | null;
   squadra_1_nome: string;
   squadra_2_nome: string;
   setWins1: number;
   setWins2: number;
   winner: number | null;
+  isPlaceholder?: boolean;
 }
 
 export default function Bracket({ faseName }: BracketProps) {
@@ -76,6 +78,7 @@ export default function Bracket({ faseName }: BracketProps) {
         else if (setWins2 > setWins1) winner = partita.squadra_2_id;
         matchData.push({
           id: partita.id,
+          numero_partita: partita.numero_partita,
           squadra_1_id: partita.squadra_1_id,
           squadra_2_id: partita.squadra_2_id,
           squadra_1_nome: squadraMap.get(partita.squadra_1_id) ?? '',
@@ -89,18 +92,65 @@ export default function Bracket({ faseName }: BracketProps) {
       setLoading(false);
     }
     fetchMatches();
+
+    const channel = supabase
+      .channel(`bracket-live-${faseName}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'fase_torneo' },
+        () => fetchMatches()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'partita' },
+        () => fetchMatches()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'partita_set' },
+        () => fetchMatches()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'squadra' },
+        () => fetchMatches()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [faseName]);
+
+  const emptyBracket: MatchData[] = Array.from({ length: 4 }, (_, index) => ({
+    id: -1 - index,
+    numero_partita: index + 1,
+    squadra_1_id: null,
+    squadra_2_id: null,
+    squadra_1_nome: '',
+    squadra_2_nome: '',
+    setWins1: 0,
+    setWins2: 0,
+    winner: null,
+    isPlaceholder: true
+  }));
+
+  const matchesToRender = matches.length > 0 ? matches : emptyBracket;
 
   return (
     <div>
       <h2>Fase {faseName}</h2>
       {loading ? (
         <p>Caricamento partite...</p>
-      ) : matches.length === 0 ? (
-        <p>Nessuna partita trovata per questa fase.</p>
       ) : (
-        <ul style={{ listStyle: 'none', padding: 0 }}>
-          {matches.map((m) => (
+        <>
+          {matches.length === 0 && (
+            <p style={{ marginTop: 0, opacity: 0.8 }}>
+              Bracket non ancora popolato: visualizzazione vuota.
+            </p>
+          )}
+          <ul style={{ listStyle: 'none', padding: 0 }}>
+            {matchesToRender.map((m) => (
             <li
               key={m.id}
               style={{
@@ -112,18 +162,20 @@ export default function Bracket({ faseName }: BracketProps) {
             >
               <div>
                 <strong>
-                  {m.squadra_1_nome} {m.setWins1} - {m.setWins2}{' '}
-                  {m.squadra_2_nome}
+                  {m.numero_partita ? `Partita ${m.numero_partita}: ` : ''}
+                  {m.squadra_1_nome || 'Da definire'} {m.isPlaceholder ? '-' : m.setWins1} -{' '}
+                  {m.isPlaceholder ? '-' : m.setWins2} {m.squadra_2_nome || 'Da definire'}
                 </strong>
               </div>
-              {m.winner && (
+              {m.winner && !m.isPlaceholder && (
                 <div>
                   Vincitore: <em>{m.winner === m.squadra_1_id ? m.squadra_1_nome : m.squadra_2_nome}</em>
                 </div>
               )}
             </li>
           ))}
-        </ul>
+          </ul>
+        </>
       )}
     </div>
   );

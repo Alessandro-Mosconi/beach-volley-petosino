@@ -84,14 +84,35 @@ export default function App() {
         .select('id, nome, orario_pranzo')
         .order('nome', { ascending: true });
       if (!error && data) {
-        setTeams(data as Team[]);
-        if (data.length > 0) setSelectedTeam(data[0].id);
+        const nextTeams = data as Team[];
+        setTeams(nextTeams);
+        setTeamsLoadError(null);
+        setSelectedTeam((currentSelected) => {
+          if (nextTeams.length === 0) return null;
+          if (currentSelected && nextTeams.some((team) => team.id === currentSelected)) {
+            return currentSelected;
+          }
+          return nextTeams[0].id;
+        });
       } else {
         setTeamsLoadError(error?.message ?? 'Errore sconosciuto');
       }
       setLoading(false);
     }
     fetchTeams();
+
+    const channel = supabase
+      .channel('teams-live')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'squadra' },
+        () => fetchTeams()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   if (loading) {

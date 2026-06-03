@@ -60,6 +60,29 @@ export default function TeamStats({ teamId, teams }: TeamStatsProps) {
       setLoading(false);
     }
     fetchStats();
+
+    const channel = supabase
+      .channel(`stats-live-${teamId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'classifica' },
+        () => fetchStats()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'girone' },
+        () => fetchStats()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'fase_torneo' },
+        () => fetchStats()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [teamId]);
 
   return (

@@ -83,6 +83,29 @@ export default function Agenda({ teamId, teams }: AgendaProps) {
       setLoading(false);
     }
     fetchAgenda();
+
+    const channel = supabase
+      .channel(`agenda-live-${teamId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'partita' },
+        () => fetchAgenda()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'campo' },
+        () => fetchAgenda()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'squadra' },
+        () => fetchAgenda()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [teamId]);
 
   const formatDateTime = (isoString: string) => {

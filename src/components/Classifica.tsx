@@ -242,25 +242,25 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
                 <colgroup>
                   <col className="standings-col-pos" />
                   <col className="standings-col-team" />
+                  <col className="standings-col-points" />
                   <col className="standings-col-small" />
                   <col className="standings-col-small" />
                   <col className="standings-col-small" />
                   <col className="standings-col-sets" />
                   <col className="standings-col-score-points" />
                   <col className="standings-col-score-points" />
-                  <col className="standings-col-points" />
                 </colgroup>
                 <thead>
                   <tr>
                     <th>Pos</th>
                     <th>Squadra</th>
+                    <th>Punti</th>
                     <th>PG</th>
                     <th>Vinte</th>
                     <th>Perse</th>
                     <th>Set V/P</th>
                     <th>PF</th>
                     <th>PS</th>
-                    <th>Punti</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -282,6 +282,7 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
                             )}
                           </div>
                         </td>
+                        <td>{row.punti_classifica}</td>
                         <td>{row.partite_giocate}</td>
                         <td>{row.partite_vinte}</td>
                         <td>{row.partite_perse}</td>
@@ -297,7 +298,6 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
                         </td>
                         <td>{row.punti_fatti}</td>
                         <td>{row.punti_subiti}</td>
-                        <td>{row.punti_classifica}</td>
                       </tr>
                     );
                   })}

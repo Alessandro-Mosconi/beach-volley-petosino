@@ -268,11 +268,7 @@ export default function Bracket({ faseName, tournamentId }: BracketProps) {
         </div>
       ) : (
         <>
-          {matches.length === 0 && (
-            <p className="bracket-empty">
-              Nessuna squadra ancora assegnata: il tabellone vuoto è pronto.
-            </p>
-          )}
+          
 
           {viewMode === 'diagram' ? (
             <div className="bracket-graph-scroll">

@@ -12,6 +12,8 @@ interface MatchEvent {
   orario_inizio: string;
   campo: string;
   detail: string;
+  team1?: string;
+  team2?: string;
   role: 'player' | 'referee' | 'lunch';
   status: string;
 }
@@ -160,6 +162,8 @@ export default function Agenda({ teamId, teams, tournamentId, onTeamChange }: Ag
           orario_inizio: eventRow.orario_inizio,
           campo: eventRow.campo_nome ?? '',
           detail: matchup,
+          team1: eventRow.squadra_1_nome ?? undefined,
+          team2: eventRow.squadra_2_nome ?? undefined,
           role: isReferee ? 'referee' : 'player',
           status: eventRow.stato ?? ''
         };
@@ -225,6 +229,20 @@ export default function Agenda({ teamId, teams, tournamentId, onTeamChange }: Ag
 
   const shouldShowStatus = (event: MatchEvent) =>
     event.role !== 'lunch' && event.status.trim().toLowerCase() !== 'programmata';
+
+  const renderEventTitle = (event: MatchEvent) => {
+    if (event.team1 && event.team2) {
+      return (
+        <span className="agenda-match-title">
+          <span>{event.team1}</span>
+          <small>vs</small>
+          <span>{event.team2}</span>
+        </span>
+      );
+    }
+
+    return event.detail;
+  };
 
   return (
     <div className="agenda-view">
@@ -295,7 +313,7 @@ export default function Agenda({ teamId, teams, tournamentId, onTeamChange }: Ag
                       <span className="agenda-status"><AgendaIcon name="pulse" />{e.status}</span>
                     )}
                   </div>
-                  <h3>{e.detail}</h3>
+                  <h3>{renderEventTitle(e)}</h3>
                 </div>
                 <div className="agenda-event-meta">
                   {e.campo && <span><AgendaIcon name="mapPin" />{e.campo}</span>}

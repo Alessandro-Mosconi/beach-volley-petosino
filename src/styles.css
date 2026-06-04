@@ -733,6 +733,19 @@ ul li {
   line-height: 1.2;
 }
 
+.agenda-match-title {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: baseline;
+}
+
+.agenda-match-title small {
+  color: var(--muted-text);
+  font-size: 0.78em;
+  font-weight: 800;
+}
+
 .agenda-event-body p {
   margin: 0.38rem 0 0;
   color: var(--text-color);
@@ -2055,6 +2068,26 @@ ul li {
 
   .team-stats-card-points strong {
     font-size: 1.25rem;
+  }
+
+  .standings-table {
+    min-width: 920px;
+    table-layout: auto;
+  }
+
+  .standings-col-team {
+    width: 280px;
+  }
+
+  .standings-table td:nth-child(2),
+  .standings-team-name {
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  .standings-team-name {
+    flex: 0 0 auto;
+    min-width: max-content;
   }
 
   .final-ranking-row {

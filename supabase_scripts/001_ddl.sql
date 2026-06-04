@@ -36,6 +36,7 @@ drop function if exists trg_partita_set_auto_vincitore_fn() cascade;
 drop function if exists trg_partita_set_ricalcola_partita_fn() cascade;
 drop function if exists trg_partita_validate_vincitore_fn() cascade;
 drop function if exists trg_squadra_codice_default_fn() cascade;
+drop function if exists trg_torneo_visibile_unico_fn() cascade;
 drop function if exists normalizza_codice(text) cascade;
 
 drop table if exists qualificazione_fase cascade;
@@ -75,8 +76,34 @@ create table torneo (
     id integer generated always as identity primary key,
     nome text not null,
     data_torneo date,
+    visibile boolean not null default false,
     creato_il timestamp with time zone not null default now()
 );
+
+create unique index uq_torneo_visibile_unico
+on torneo (visibile)
+where visibile;
+
+create or replace function trg_torneo_visibile_unico_fn()
+returns trigger
+language plpgsql
+as $$
+begin
+    if new.visibile then
+        update torneo
+        set visibile = false
+        where id <> new.id
+          and visibile = true;
+    end if;
+
+    return new;
+end;
+$$;
+
+create trigger trg_torneo_visibile_unico
+before insert or update of visibile on torneo
+for each row
+execute function trg_torneo_visibile_unico_fn();
 
 -- =====================================================
 -- CAMPO

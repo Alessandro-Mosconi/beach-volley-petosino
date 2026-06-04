@@ -13,6 +13,11 @@ interface Team {
   orario_pranzo: string | null;
 }
 
+interface Tournament {
+  id: number;
+  nome: string;
+}
+
 type View = 'agenda' | 'partite' | 'classifica' | 'gold' | 'silver' | 'stats' | 'info_service';
 type Theme = 'dark' | 'light';
 
@@ -85,6 +90,7 @@ function pathFromView(view: View): string {
 
 export default function App() {
   const [teams, setTeams] = useState<Team[]>([]);
+  const [activeTournament, setActiveTournament] = useState<Tournament | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
   const [view, setView] = useState<View>(viewFromPath(window.location.pathname));
   const [loading, setLoading] = useState<boolean>(true);
@@ -115,15 +121,32 @@ export default function App() {
     }
   };
 
-  // Load all teams on mount
   useEffect(() => {
-    async function fetchTeams() {
-      const { data, error } = await supabase
+    async function fetchTournamentAndTeams() {
+      const { data: tournament, error: tournamentError } = await supabase
+        .from('torneo')
+        .select('id, nome')
+        .eq('visibile', true)
+        .single();
+
+      if (tournamentError || !tournament) {
+        setActiveTournament(null);
+        setTeams([]);
+        setTeamsLoadError(tournamentError?.message ?? 'Nessun torneo visibile configurato');
+        setLoading(false);
+        return;
+      }
+
+      setActiveTournament(tournament as Tournament);
+
+      const { data: teamsData, error } = await supabase
         .from('squadra')
         .select('codice, nome, orario_pranzo')
+        .eq('torneo_id', tournament.id)
         .order('nome', { ascending: true });
-      if (!error && data) {
-        const nextTeams = data as Team[];
+
+      if (!error && teamsData) {
+        const nextTeams = teamsData as Team[];
         setTeams(nextTeams);
         setTeamsLoadError(null);
         setSelectedTeam((currentSelected) => {
@@ -138,14 +161,19 @@ export default function App() {
       }
       setLoading(false);
     }
-    fetchTeams();
+    fetchTournamentAndTeams();
 
     const channel = supabase
-      .channel('teams-live')
+      .channel('app-tournament-live')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'torneo' },
+        () => fetchTournamentAndTeams()
+      )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'squadra' },
-        () => fetchTeams()
+        () => fetchTournamentAndTeams()
       )
       .subscribe();
 
@@ -156,6 +184,16 @@ export default function App() {
 
   if (loading) {
     return <p>Caricamento squadre in corso...</p>;
+  }
+
+  if (!activeTournament) {
+    return (
+      <div className="app-shell">
+        <div className="section-panel">
+          <p>Nessun torneo visibile configurato.{teamsLoadError ? ` Errore Supabase: ${teamsLoadError}` : ''}</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -224,14 +262,14 @@ export default function App() {
           </p>
         )}
         {view === 'agenda' && selectedTeam && (
-          <Agenda teamId={selectedTeam} teams={teams} />
+          <Agenda teamId={selectedTeam} teams={teams} tournamentId={activeTournament.id} />
         )}
-        {view === 'classifica' && <Classifica faseName="GIRONI" />}
-        {view === 'partite' && <MatchesByCourt />}
-        {view === 'gold' && <Bracket faseName="GOLD" />}
-        {view === 'silver' && <Bracket faseName="SILVER" />}
+        {view === 'classifica' && <Classifica faseName="GIRONI" tournamentId={activeTournament.id} />}
+        {view === 'partite' && <MatchesByCourt tournamentId={activeTournament.id} />}
+        {view === 'gold' && <Bracket faseName="GOLD" tournamentId={activeTournament.id} />}
+        {view === 'silver' && <Bracket faseName="SILVER" tournamentId={activeTournament.id} />}
         {view === 'stats' && selectedTeam && (
-          <TeamStats teamId={selectedTeam} teams={teams} />
+          <TeamStats teamId={selectedTeam} teams={teams} tournamentId={activeTournament.id} />
         )}
         {view === 'info_service' && <InfoService />}
       </div>

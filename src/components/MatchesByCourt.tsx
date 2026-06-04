@@ -92,7 +92,11 @@ function LunchCell({ lunches }: { lunches: LunchEvent[] }) {
   );
 }
 
-export default function MatchesByCourt() {
+interface MatchesByCourtProps {
+  tournamentId: number;
+}
+
+export default function MatchesByCourt({ tournamentId }: MatchesByCourtProps) {
   const [courts, setCourts] = useState<Court[]>([]);
   const [matches, setMatches] = useState<CourtMatch[]>([]);
   const [lunches, setLunches] = useState<LunchEvent[]>([]);
@@ -103,17 +107,23 @@ export default function MatchesByCourt() {
     async function fetchData() {
       setLoading(true);
       const [courtsRes, matchesRes, lunchesRes] = await Promise.all([
-        supabase.from('campo').select('codice, nome, ordine').order('ordine', { ascending: true }),
+        supabase
+          .from('campo')
+          .select('codice, nome, ordine')
+          .eq('torneo_id', tournamentId)
+          .order('ordine', { ascending: true }),
         supabase
           .from('v_partita_risultato')
           .select(
             'partita_id, fase_torneo_codice, girone_codice, campo_codice, campo_nome, orario_inizio, squadra_1_nome, squadra_2_nome, squadra_arbitro_nome, arbitro_organizzazione, risultato_set, stato'
           )
+          .eq('torneo_id', tournamentId)
           .order('orario_inizio', { ascending: true })
           .order('campo_codice', { ascending: true }),
         supabase
           .from('v_agenda_squadra')
-          .select('squadra_codice, squadra_nome, orario_inizio')
+          .select('squadra_codice, squadra_nome, orario_inizio, torneo_id')
+          .eq('torneo_id', tournamentId)
           .eq('tipo_evento', 'PRANZO')
           .order('orario_inizio', { ascending: true })
       ]);
@@ -153,7 +163,7 @@ export default function MatchesByCourt() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [tournamentId]);
 
   const scheduleRows = useMemo(() => {
     const times = Array.from(

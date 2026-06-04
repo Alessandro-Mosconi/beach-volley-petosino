@@ -3,6 +3,7 @@ import { supabase } from '../utils/supabase';
 
 interface BracketProps {
   faseName: string;
+  tournamentId: number;
 }
 
 interface MatchData {
@@ -103,7 +104,7 @@ function winnerName(match: BracketSlot) {
   return match.winner === match.squadra_1_codice ? match.squadra_1_nome : match.squadra_2_nome;
 }
 
-export default function Bracket({ faseName }: BracketProps) {
+export default function Bracket({ faseName, tournamentId }: BracketProps) {
   const [matches, setMatches] = useState<MatchData[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [viewMode, setViewMode] = useState<BracketViewMode>('diagram');
@@ -116,6 +117,7 @@ export default function Bracket({ faseName }: BracketProps) {
         .select(
           'partita_id, squadra_1_codice, squadra_1_nome, squadra_2_codice, squadra_2_nome, squadra_vincitrice_codice, orario_inizio, campo_nome, set_vinti_squadra_1, set_vinti_squadra_2'
         )
+        .eq('torneo_id', tournamentId)
         .eq('fase_torneo_codice', faseName)
         .order('orario_inizio', { ascending: true })
         .order('campo_nome', { ascending: true })
@@ -157,7 +159,7 @@ export default function Bracket({ faseName }: BracketProps) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [faseName]);
+  }, [faseName, tournamentId]);
 
   const slots = createSlots(matches);
 

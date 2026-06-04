@@ -3,6 +3,7 @@ import { supabase } from '../utils/supabase';
 
 interface ClassificaProps {
   faseName: string; // e.g. 'GIRONI'
+  tournamentId: number;
 }
 
 interface TeamRow {
@@ -19,7 +20,7 @@ interface TeamRow {
   girone_nome: string;
 }
 
-export default function Classifica({ faseName }: ClassificaProps) {
+export default function Classifica({ faseName, tournamentId }: ClassificaProps) {
   const [rows, setRows] = useState<TeamRow[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -31,6 +32,7 @@ export default function Classifica({ faseName }: ClassificaProps) {
         .select(
           'posizione, squadra_codice, squadra_nome, partite_giocate, partite_vinte, partite_perse, set_vinti, set_persi, punti_classifica, girone_codice, girone_nome'
         )
+        .eq('torneo_id', tournamentId)
         .order('girone_codice', { ascending: true })
         .order('posizione', { ascending: true });
       if (error) {
@@ -41,8 +43,8 @@ export default function Classifica({ faseName }: ClassificaProps) {
 
       const [participantsRes, squadreRes, gironiRes] = await Promise.all([
         supabase.from('girone_squadra').select('girone_codice, squadra_codice'),
-        supabase.from('squadra').select('codice, nome'),
-        supabase.from('girone').select('codice, nome')
+        supabase.from('squadra').select('codice, nome').eq('torneo_id', tournamentId),
+        supabase.from('girone').select('codice, nome').eq('torneo_id', tournamentId)
       ]);
 
       if (participantsRes.error || squadreRes.error || gironiRes.error) {
@@ -75,7 +77,9 @@ export default function Classifica({ faseName }: ClassificaProps) {
         });
       });
 
-      const mergedRows: TeamRow[] = (participantsRes.data ?? []).map((p) => {
+      const mergedRows: TeamRow[] = (participantsRes.data ?? [])
+        .filter((p) => gironeMap.has(p.girone_codice) && squadraMap.has(p.squadra_codice))
+        .map((p) => {
         const key = `${p.girone_codice}-${p.squadra_codice}`;
         const ranked = classificaMap.get(key);
         if (ranked) return ranked;
@@ -154,7 +158,7 @@ export default function Classifica({ faseName }: ClassificaProps) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [faseName]);
+  }, [faseName, tournamentId]);
 
   // Group rows by girone
   const groups: { [key: string]: TeamRow[] } = {};

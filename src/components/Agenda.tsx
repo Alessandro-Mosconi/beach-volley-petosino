@@ -106,9 +106,10 @@ const EVENT_META = {
 interface AgendaProps {
   teamId: string;
   teams: Team[];
+  tournamentId: number;
 }
 
-export default function Agenda({ teamId, teams }: AgendaProps) {
+export default function Agenda({ teamId, teams, tournamentId }: AgendaProps) {
   const [events, setEvents] = useState<MatchEvent[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -122,8 +123,9 @@ export default function Agenda({ teamId, teams }: AgendaProps) {
       const { data, error } = await supabase
         .from('v_agenda_squadra')
         .select(
-          'tipo_evento, partita_id, squadra_codice, campo_nome, orario_inizio, squadra_1_nome, squadra_2_nome, squadra_avversaria_nome, stato'
+          'tipo_evento, partita_id, squadra_codice, campo_nome, orario_inizio, squadra_1_nome, squadra_2_nome, squadra_avversaria_nome, stato, torneo_id'
         )
+        .eq('torneo_id', tournamentId)
         .eq('squadra_codice', teamId)
         .order('orario_inizio', { ascending: true });
 
@@ -198,7 +200,7 @@ export default function Agenda({ teamId, teams }: AgendaProps) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [teamId]);
+  }, [teamId, tournamentId]);
 
   const formatTime = (isoString: string) => {
     const date = new Date(isoString);

@@ -10,6 +10,7 @@ interface Team {
 interface TeamStatsProps {
   teamId: string;
   teams: Team[];
+  tournamentId: number;
 }
 
 interface StatRow {
@@ -24,7 +25,7 @@ interface StatRow {
   punti_classifica: number;
 }
 
-export default function TeamStats({ teamId, teams }: TeamStatsProps) {
+export default function TeamStats({ teamId, teams, tournamentId }: TeamStatsProps) {
   const [stats, setStats] = useState<StatRow[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const team = teams.find((t) => t.codice === teamId);
@@ -37,6 +38,7 @@ export default function TeamStats({ teamId, teams }: TeamStatsProps) {
         .select(
           'fase_nome, girone_nome, posizione, partite_giocate, partite_vinte, partite_perse, set_vinti, set_persi, punti_classifica, fase_torneo_codice'
         )
+        .eq('torneo_id', tournamentId)
         .eq('squadra_codice', teamId)
         .order('fase_torneo_codice', { ascending: true });
       if (error || !data) {
@@ -87,7 +89,7 @@ export default function TeamStats({ teamId, teams }: TeamStatsProps) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [teamId]);
+  }, [teamId, tournamentId]);
 
   return (
     <div>

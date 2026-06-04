@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { Session } from '@supabase/supabase-js';
 import { supabase } from './utils/supabase';
 import Agenda from './components/Agenda';
 import Classifica from './components/Classifica';
@@ -20,6 +21,106 @@ interface Tournament {
 
 type View = 'agenda' | 'partite' | 'classifica' | 'gold' | 'silver' | 'stats' | 'info_service';
 type Theme = 'dark' | 'light';
+const SELECTED_TEAM_STORAGE_KEY = 'beach-volley:selectedTeam';
+
+function AuthPanel({
+  session,
+  canEdit,
+  onSessionChange
+}: {
+  session: Session | null;
+  canEdit: boolean;
+  onSessionChange: (session: Session | null) => void;
+}) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [message, setMessage] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  const signIn = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setBusy(true);
+    setMessage(null);
+
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      setMessage('Accesso non riuscito. Controlla email e password.');
+    } else {
+      onSessionChange(data.session);
+      setEmail('');
+      setPassword('');
+      setMessage(null);
+      setOpen(false);
+    }
+    setBusy(false);
+  };
+
+  const signOut = async () => {
+    setBusy(true);
+    await supabase.auth.signOut();
+    onSessionChange(null);
+    setBusy(false);
+  };
+
+  if (session) {
+    return (
+      <div className="auth-menu">
+        <button
+          className={`auth-menu-trigger ${canEdit ? 'auth-menu-trigger-ok' : ''}`}
+          type="button"
+          onClick={() => setOpen((currentOpen) => !currentOpen)}
+        >
+          Operatore
+        </button>
+        {open && (
+          <div className="auth-popover auth-popover-active">
+            <div>
+              <span>Accesso attivo</span>
+              <strong>{session.user.email}</strong>
+              {!canEdit && <small>Non autorizzato alla modifica</small>}
+            </div>
+            <button type="button" onClick={signOut} disabled={busy}>
+              Esci
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="auth-menu">
+      <button className="auth-menu-trigger" type="button" onClick={() => setOpen((currentOpen) => !currentOpen)}>
+        Login
+      </button>
+      {open && (
+        <form className="auth-popover" onSubmit={signIn}>
+          <input
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="Email"
+            autoComplete="email"
+            required
+          />
+          <input
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            placeholder="Password"
+            autoComplete="current-password"
+            required
+          />
+          <button type="submit" disabled={busy}>
+            Entra
+          </button>
+          {message && <small>{message}</small>}
+        </form>
+      )}
+    </div>
+  );
+}
 
 function ThemeIcon({ type }: { type: Theme }) {
   if (type === 'light') {
@@ -91,14 +192,53 @@ function pathFromView(view: View): string {
 export default function App() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [activeTournament, setActiveTournament] = useState<Tournament | null>(null);
-  const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
+  const [selectedTeam, setSelectedTeam] = useState<string | null>(() =>
+    window.localStorage.getItem(SELECTED_TEAM_STORAGE_KEY)
+  );
   const [view, setView] = useState<View>(viewFromPath(window.location.pathname));
   const [loading, setLoading] = useState<boolean>(true);
   const [teamsLoadError, setTeamsLoadError] = useState<string | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [canEditResults, setCanEditResults] = useState(false);
   const [theme, setTheme] = useState<Theme>(() => {
     const storedTheme = window.localStorage.getItem('theme');
     return storedTheme === 'light' ? 'light' : 'dark';
   });
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+    });
+
+    const { data: authSubscription } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+    });
+
+    return () => {
+      authSubscription.subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    async function fetchOperatorPermission() {
+      if (!session?.user.email) {
+        setCanEditResults(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('operatore_app')
+        .select('email')
+        .eq('email', session.user.email)
+        .eq('attivo', true)
+        .eq('puo_modificare', true)
+        .maybeSingle();
+
+      setCanEditResults(!error && Boolean(data));
+    }
+
+    fetchOperatorPermission();
+  }, [session]);
 
   useEffect(() => {
     const onPopState = () => {
@@ -112,6 +252,14 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme);
     window.localStorage.setItem('theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (selectedTeam) {
+      window.localStorage.setItem(SELECTED_TEAM_STORAGE_KEY, selectedTeam);
+    } else {
+      window.localStorage.removeItem(SELECTED_TEAM_STORAGE_KEY);
+    }
+  }, [selectedTeam]);
 
   const goToView = (nextView: View) => {
     setView(nextView);
@@ -200,38 +348,26 @@ export default function App() {
     <div className="app-shell">
       <header className="app-header">
         <h1>Torneo Beach Volley</h1>
-        <button
-          className="theme-toggle"
-          type="button"
-          aria-label={theme === 'dark' ? 'Passa al tema chiaro' : 'Passa al tema scuro'}
-          aria-pressed={theme === 'dark'}
-          title={theme === 'dark' ? 'Tema scuro' : 'Tema chiaro'}
-          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-        >
-          <span className="theme-toggle-icon theme-toggle-sun">
-            <ThemeIcon type="light" />
-          </span>
-          <span className="theme-toggle-icon theme-toggle-moon">
-            <ThemeIcon type="dark" />
-          </span>
-          <span className="theme-toggle-thumb" />
-        </button>
-      </header>
-      {teams.length > 0 && (
-        <label className="team-select">
-          Seleziona squadra:{' '}
-          <select
-            value={selectedTeam ?? undefined}
-            onChange={(e) => setSelectedTeam(e.target.value)}
+        <div className="header-actions">
+          <AuthPanel session={session} canEdit={canEditResults} onSessionChange={setSession} />
+          <button
+            className="theme-toggle"
+            type="button"
+            aria-label={theme === 'dark' ? 'Passa al tema chiaro' : 'Passa al tema scuro'}
+            aria-pressed={theme === 'dark'}
+            title={theme === 'dark' ? 'Tema scuro' : 'Tema chiaro'}
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
           >
-            {teams.map((team) => (
-              <option key={team.codice} value={team.codice}>
-                {team.nome}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
+            <span className="theme-toggle-icon theme-toggle-sun">
+              <ThemeIcon type="light" />
+            </span>
+            <span className="theme-toggle-icon theme-toggle-moon">
+              <ThemeIcon type="dark" />
+            </span>
+            <span className="theme-toggle-thumb" />
+          </button>
+        </div>
+      </header>
       {/* Navigation */}
       <nav className="tab-nav">
         <button onClick={() => goToView('agenda')} disabled={view === 'agenda'}>
@@ -262,10 +398,15 @@ export default function App() {
           </p>
         )}
         {view === 'agenda' && selectedTeam && (
-          <Agenda teamId={selectedTeam} teams={teams} tournamentId={activeTournament.id} />
+          <Agenda
+            teamId={selectedTeam}
+            teams={teams}
+            tournamentId={activeTournament.id}
+            onTeamChange={setSelectedTeam}
+          />
         )}
         {view === 'classifica' && <Classifica faseName="GIRONI" tournamentId={activeTournament.id} />}
-        {view === 'partite' && <MatchesByCourt tournamentId={activeTournament.id} />}
+        {view === 'partite' && <MatchesByCourt tournamentId={activeTournament.id} canEdit={canEditResults} />}
         {view === 'gold' && <Bracket faseName="GOLD" tournamentId={activeTournament.id} />}
         {view === 'silver' && <Bracket faseName="SILVER" tournamentId={activeTournament.id} />}
         {view === 'stats' && selectedTeam && (

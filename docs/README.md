@@ -66,16 +66,22 @@ Per distribuire l'applicazione su Vercel:
 
 ## Modifiche al database
 
-Sono forniti due script SQL nella cartella `supabase_scripts`:
+Sono forniti quattro script SQL nella cartella `supabase_scripts`:
 
 * **001_create_schema.sql**: crea tutte le tabelle necessarie (`torneo`, `campo`, `squadra`, `girone`, `girone_squadra`, `fase_torneo`, `partita`, `partita_set`, `classifica`, `qualificazione_fase`) e inserisce le fasi base (`GIRONI`, `GOLD`, `SILVER`) e tre campi di esempio. Usa questo script se parti da un database vuoto.
 
 * **002_alter_schema.sql**: applica modifiche incrementalmente a uno schema esistente. Rende obbligatoria la colonna `campo_id` nella tabella `partita`, crea la tabella `campo` se non esiste, imposta un vincolo di unicità su `(torneo_id, nome)` e inserisce tre campi di esempio se mancanti. Usa questo se hai già eseguito una versione precedente dello schema e vuoi aggiornarla.
 
+* **003_operatori_risultati.sql**: aggiunge la tabella minimale `operatore_app` e le policy RLS che consentono a utenti Supabase Auth specifici di inserire/modificare/eliminare partite, set e punteggi. La lettura resta pubblica.
+
+* **004_remove_turno_partita.sql**: rimuove la colonna `turno` dalla tabella `partita` e ricrea le view dipendenti senza quel campo.
+
 Per applicare gli script su Supabase puoi utilizzare la sezione **SQL Editor** della dashboard:
 
 1. Carica e esegui `001_create_schema.sql` per creare lo schema da zero. Se il tuo database esiste già, passa direttamente allo script di aggiornamento.
 2. Carica e esegui `002_alter_schema.sql` per allineare la struttura alle modifiche più recenti. Gli script sono idempotenti: se i vincoli o le tabelle esistono già, non verranno duplicati.
+3. Carica e esegui `003_operatori_risultati.sql` se vuoi limitare la scrittura dei risultati agli operatori autorizzati.
+4. Carica e esegui `004_remove_turno_partita.sql` se il database esistente contiene ancora la colonna `turno` in `partita`.
 
 ### Ordine degli script
 
@@ -83,6 +89,27 @@ Gli script sono numerati secondo l'ordine con cui dovrebbero essere eseguiti:
 
 1. **001_create_schema.sql** – crea lo schema e i dati di base.
 2. **002_alter_schema.sql** – aggiorna lo schema (opzionale, solo se necessario).
+3. **003_operatori_risultati.sql** – abilita i permessi di scrittura selettivi.
+4. **004_remove_turno_partita.sql** – rimuove il campo `turno` e aggiorna le view.
+
+### Autorizzare chi inserisce risultati
+
+Dopo aver creato un utente in Supabase Auth, aggiungi la sua email come operatore:
+
+```sql
+insert into operatore_app (email, nome)
+values ('nome@example.com', 'Nome Cognome');
+```
+
+Per revocare l'accesso senza cancellare lo storico:
+
+```sql
+update operatore_app
+set attivo = false
+where lower(email) = lower('nome@example.com');
+```
+
+Gli operatori autorizzati possono entrare dall'app con email e password e aggiornare i risultati direttamente dalla schermata **Partite**.
 
 ## Personalizzazioni future
 

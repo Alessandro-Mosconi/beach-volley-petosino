@@ -107,9 +107,10 @@ interface AgendaProps {
   teamId: string;
   teams: Team[];
   tournamentId: number;
+  onTeamChange: (teamId: string) => void;
 }
 
-export default function Agenda({ teamId, teams, tournamentId }: AgendaProps) {
+export default function Agenda({ teamId, teams, tournamentId, onTeamChange }: AgendaProps) {
   const [events, setEvents] = useState<MatchEvent[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -226,14 +227,28 @@ export default function Agenda({ teamId, teams, tournamentId }: AgendaProps) {
       <div className="agenda-heading">
         <div>
           <h2>Agenda giornaliera</h2>
-          <p>{team?.nome ?? 'Squadra selezionata'}</p>
         </div>
-        {lunchTime && (
-          <div className="agenda-lunch-summary">
-            <span><AgendaIcon name="utensils" /> Pranzo</span>
-            <strong>{lunchTime.slice(0, 5)}</strong>
-          </div>
-        )}
+        <div className="agenda-heading-actions">
+          <label className="team-select agenda-team-select">
+            Squadra
+            <select
+              value={teamId}
+              onChange={(event) => onTeamChange(event.target.value)}
+            >
+              {teams.map((teamOption) => (
+                <option key={teamOption.codice} value={teamOption.codice}>
+                  {teamOption.nome}
+                </option>
+              ))}
+            </select>
+          </label>
+          {lunchTime && (
+            <div className="agenda-lunch-summary">
+              <span><AgendaIcon name="utensils" /> Pranzo</span>
+              <strong>{lunchTime.slice(0, 5)}</strong>
+            </div>
+          )}
+        </div>
       </div>
 
       {loading ? (

@@ -35,6 +35,9 @@ drop function if exists ricalcola_risultato_partita(integer) cascade;
 drop function if exists trg_partita_set_auto_vincitore_fn() cascade;
 drop function if exists trg_partita_set_ricalcola_partita_fn() cascade;
 drop function if exists trg_partita_validate_vincitore_fn() cascade;
+drop function if exists puo_modificare_risultati() cascade;
+drop function if exists puo_modificare_risultati_partita(integer) cascade;
+drop function if exists puo_modificare_risultati_set(integer) cascade;
 drop function if exists trg_squadra_codice_default_fn() cascade;
 drop function if exists trg_torneo_visibile_unico_fn() cascade;
 drop function if exists normalizza_codice(text) cascade;
@@ -42,6 +45,8 @@ drop function if exists normalizza_codice(text) cascade;
 drop table if exists qualificazione_fase cascade;
 drop table if exists partita_set cascade;
 drop table if exists partita cascade;
+drop table if exists operatore_app cascade;
+drop table if exists torneo_operatore cascade;
 drop table if exists girone_squadra cascade;
 drop table if exists squadra cascade;
 drop table if exists girone cascade;
@@ -104,6 +109,42 @@ create trigger trg_torneo_visibile_unico
 before insert or update of visibile on torneo
 for each row
 execute function trg_torneo_visibile_unico_fn();
+
+-- =====================================================
+-- OPERATORI AUTORIZZATI
+-- Whitelist globale: gli utenti Supabase Auth presenti qui possono
+-- inserire/modificare partite, set e punteggi dall'app.
+-- =====================================================
+
+create table operatore_app (
+    id integer generated always as identity primary key,
+    email text not null,
+    nome text,
+    puo_modificare boolean not null default true,
+    attivo boolean not null default true,
+    creato_il timestamp with time zone not null default now(),
+    constraint chk_operatore_app_email_non_vuota check (btrim(email) <> '')
+);
+
+create unique index uq_operatore_app_email
+on operatore_app (lower(email));
+
+create or replace function puo_modificare_risultati()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+    select exists (
+        select 1
+        from operatore_app operatore
+        where operatore.attivo = true
+          and operatore.puo_modificare = true
+          and lower(operatore.email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+          and auth.role() = 'authenticated'
+    );
+$$;
 
 -- =====================================================
 -- CAMPO
@@ -213,7 +254,6 @@ create table partita (
     fase_torneo_codice text not null references fase_torneo(codice),
     girone_codice text references girone(codice) on delete set null,
     campo_codice text not null references campo(codice),
-    turno text not null,
     orario_inizio timestamp with time zone not null,
     squadra_1_codice text not null references squadra(codice),
     squadra_2_codice text not null references squadra(codice),
@@ -455,7 +495,6 @@ select
     p.girone_codice,
     p.campo_codice,
     c.nome as campo_nome,
-    p.turno,
     p.orario_inizio,
     p.squadra_1_codice,
     s1.nome as squadra_1_nome,
@@ -493,7 +532,7 @@ left join squadra sp on sp.codice = p.squadra_perdente_codice
 left join partita_set ps on ps.partita_id = p.id
 group by
     p.id, p.torneo_id, p.fase_torneo_codice, p.girone_codice, p.campo_codice,
-    c.nome, p.turno, p.orario_inizio,
+    c.nome, p.orario_inizio,
     p.squadra_1_codice, s1.nome, p.squadra_2_codice, s2.nome,
     p.squadra_arbitro_codice, sa.nome,
     p.squadra_vincitrice_codice, sv.nome,
@@ -513,7 +552,6 @@ select
     r.girone_codice,
     r.campo_codice,
     r.campo_nome,
-    r.turno,
     r.orario_inizio,
     r.squadra_1_codice as squadra_codice,
     r.squadra_1_nome as squadra_nome,
@@ -542,7 +580,6 @@ select
     r.girone_codice,
     r.campo_codice,
     r.campo_nome,
-    r.turno,
     r.orario_inizio,
     r.squadra_2_codice as squadra_codice,
     r.squadra_2_nome as squadra_nome,
@@ -806,6 +843,7 @@ alter table fase_torneo enable row level security;
 alter table girone enable row level security;
 alter table squadra enable row level security;
 alter table girone_squadra enable row level security;
+alter table operatore_app enable row level security;
 alter table partita enable row level security;
 alter table partita_set enable row level security;
 alter table qualificazione_fase enable row level security;
@@ -816,12 +854,36 @@ create policy public_read_fase_torneo on fase_torneo for select to anon, authent
 create policy public_read_girone on girone for select to anon, authenticated using (true);
 create policy public_read_squadra on squadra for select to anon, authenticated using (true);
 create policy public_read_girone_squadra on girone_squadra for select to anon, authenticated using (true);
+create policy own_operatore_app on operatore_app for select to authenticated
+using (lower(email) = lower(coalesce(auth.jwt() ->> 'email', '')));
 create policy public_read_partita on partita for select to anon, authenticated using (true);
 create policy public_read_partita_set on partita_set for select to anon, authenticated using (true);
 create policy public_read_qualificazione_fase on qualificazione_fase for select to anon, authenticated using (true);
 
+create policy operator_insert_partita on partita for insert to authenticated
+with check (puo_modificare_risultati());
+
+create policy operator_update_partita on partita for update to authenticated
+using (puo_modificare_risultati())
+with check (puo_modificare_risultati());
+
+create policy operator_delete_partita on partita for delete to authenticated
+using (puo_modificare_risultati());
+
+create policy operator_insert_partita_set on partita_set for insert to authenticated
+with check (puo_modificare_risultati());
+
+create policy operator_update_partita_set on partita_set for update to authenticated
+using (puo_modificare_risultati())
+with check (puo_modificare_risultati());
+
+create policy operator_delete_partita_set on partita_set for delete to authenticated
+using (puo_modificare_risultati());
+
 grant usage on schema public to anon, authenticated;
 grant select on all tables in schema public to anon, authenticated;
+grant insert, update, delete on partita, partita_set to authenticated;
+grant usage, select on sequence partita_id_seq, partita_set_id_seq to authenticated;
 grant select on
     v_partita_risultato,
     v_partita_squadra,

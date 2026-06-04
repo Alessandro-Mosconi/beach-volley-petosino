@@ -8,6 +8,7 @@ import TeamStats from './components/TeamStats';
 import InfoService from './components/InfoService';
 import MatchesByCourt from './components/MatchesByCourt';
 import FinalRanking from './components/FinalRanking';
+import Regolamento from './components/Regolamento';
 
 interface Team {
   codice: string;
@@ -29,6 +30,7 @@ type View =
   | 'gold_ranking'
   | 'silver_ranking'
   | 'stats'
+  | 'regolamento'
   | 'info_service';
 type Theme = 'dark' | 'light';
 const SELECTED_TEAM_STORAGE_KEY = 'beach-volley:selectedTeam';
@@ -41,6 +43,7 @@ const NAV_ITEMS: Array<{ view: View; label: string; rankingPhase?: 'GOLD' | 'SIL
   { view: 'silver', label: 'Silver' },
   { view: 'silver_ranking', label: 'Classifica Silver', rankingPhase: 'SILVER' },
   { view: 'stats', label: 'Statistiche Squadra' },
+  { view: 'regolamento', label: 'Regolamento' },
   { view: 'info_service', label: 'Info Service' }
 ];
 
@@ -207,6 +210,8 @@ function viewFromPath(pathname: string): View {
       return 'silver_ranking';
     case '/stats':
       return 'stats';
+    case '/regolamento':
+      return 'regolamento';
     case '/info_service':
       return 'info_service';
     default:
@@ -232,6 +237,8 @@ function pathFromView(view: View): string {
       return '/classifica-silver';
     case 'stats':
       return '/stats';
+    case 'regolamento':
+      return '/regolamento';
     case 'info_service':
       return '/info_service';
     default:
@@ -568,6 +575,7 @@ export default function App() {
             onTeamChange={setSelectedTeam}
           />
         )}
+        {view === 'regolamento' && <Regolamento />}
         {view === 'info_service' && <InfoService />}
       </div>
     </div>

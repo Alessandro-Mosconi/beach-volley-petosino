@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../utils/supabase';
 
 interface ClassificaProps {
@@ -22,6 +23,19 @@ interface TeamRow {
   girone_nome: string;
 }
 
+interface SetBreakdownRow {
+  partita_id: number;
+  girone_codice: string;
+  squadra_codice: string;
+  avversaria_nome: string;
+  set_vinti: number;
+  set_persi: number;
+  punti_fatti: number;
+  punti_subiti: number;
+  orario_inizio: string;
+  risultato_squadra: string;
+}
+
 function getQualificationTier(position: number | null) {
   if (position === null) return null;
   if (position <= 2) return 'gold';
@@ -31,6 +45,8 @@ function getQualificationTier(position: number | null) {
 
 export default function Classifica({ faseName, tournamentId }: ClassificaProps) {
   const [rows, setRows] = useState<TeamRow[]>([]);
+  const [setBreakdownByTeam, setSetBreakdownByTeam] = useState<Record<string, SetBreakdownRow[]>>({});
+  const [selectedSetTeam, setSelectedSetTeam] = useState<TeamRow | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
@@ -50,14 +66,23 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
         return;
       }
 
-      const [participantsRes, squadreRes, gironiRes] = await Promise.all([
+      const [participantsRes, squadreRes, gironiRes, setBreakdownRes] = await Promise.all([
         supabase.from('girone_squadra').select('girone_codice, squadra_codice'),
         supabase.from('squadra').select('codice, nome').eq('torneo_id', tournamentId),
-        supabase.from('girone').select('codice, nome').eq('torneo_id', tournamentId)
+        supabase.from('girone').select('codice, nome').eq('torneo_id', tournamentId),
+        supabase
+          .from('v_partita_squadra')
+          .select(
+            'partita_id, girone_codice, squadra_codice, avversaria_nome, set_vinti, set_persi, punti_fatti, punti_subiti, orario_inizio, risultato_squadra'
+          )
+          .eq('torneo_id', tournamentId)
+          .eq('fase_torneo_codice', faseName)
+          .order('orario_inizio', { ascending: true })
       ]);
 
-      if (participantsRes.error || squadreRes.error || gironiRes.error) {
+      if (participantsRes.error || squadreRes.error || gironiRes.error || setBreakdownRes.error) {
         setRows([]);
+        setSetBreakdownByTeam({});
         setLoading(false);
         return;
       }
@@ -142,6 +167,15 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
       });
 
       setRows(formatted);
+      const nextBreakdownByTeam: Record<string, SetBreakdownRow[]> = {};
+      ((setBreakdownRes.data ?? []) as SetBreakdownRow[])
+        .filter((match) => match.set_vinti + match.set_persi > 0)
+        .forEach((match) => {
+          const key = `${match.girone_codice}-${match.squadra_codice}`;
+          if (!nextBreakdownByTeam[key]) nextBreakdownByTeam[key] = [];
+          nextBreakdownByTeam[key].push(match);
+        });
+      setSetBreakdownByTeam(nextBreakdownByTeam);
       setLoading(false);
     }
     fetchData();
@@ -187,6 +221,10 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
     if (!groups[key]) groups[key] = [];
     groups[key].push(r);
   });
+
+  const selectedSetRows = selectedSetTeam
+    ? setBreakdownByTeam[`${selectedSetTeam.girone_codice}-${selectedSetTeam.squadra_codice}`] ?? []
+    : [];
 
   return (
     <div className="standings-view">
@@ -235,18 +273,27 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
                       >
                         <td>{row.posizione ?? '-'}</td>
                         <td>
-                          <span className="standings-team-name">{row.squadra_nome}</span>
-                          {qualificationTier && (
-                            <span className={`standings-qualification standings-qualification-${qualificationTier}`}>
-                              {qualificationTier === 'gold' ? 'Gold' : 'Silver'}
-                            </span>
-                          )}
+                          <div className="standings-team-cell">
+                            <span className="standings-team-name">{row.squadra_nome}</span>
+                            {qualificationTier && (
+                              <span className={`standings-qualification standings-qualification-${qualificationTier}`}>
+                                {qualificationTier === 'gold' ? 'Gold' : 'Silver'}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td>{row.partite_giocate}</td>
                         <td>{row.partite_vinte}</td>
                         <td>{row.partite_perse}</td>
                         <td>
-                          {row.set_vinti} / {row.set_persi}
+                          <button
+                            className="standings-set-detail-button"
+                            type="button"
+                            disabled={row.set_vinti + row.set_persi === 0}
+                            onClick={() => setSelectedSetTeam(row)}
+                          >
+                            {row.set_vinti} / {row.set_persi}
+                          </button>
                         </td>
                         <td>{row.punti_fatti}</td>
                         <td>{row.punti_subiti}</td>
@@ -260,6 +307,46 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
           </section>
         ))
       )}
+      {selectedSetTeam &&
+        createPortal(
+          <div className="standings-set-modal-backdrop" role="presentation" onClick={() => setSelectedSetTeam(null)}>
+            <section className="standings-set-modal" role="dialog" aria-modal="true" aria-labelledby="set-detail-title" onClick={(event) => event.stopPropagation()}>
+              <div className="standings-set-modal-heading">
+                <div>
+                  <span>Set V/P</span>
+                  <h3 id="set-detail-title">{selectedSetTeam.squadra_nome}</h3>
+                </div>
+                <button type="button" onClick={() => setSelectedSetTeam(null)} aria-label="Chiudi dettaglio set">
+                  X
+                </button>
+              </div>
+
+              {selectedSetRows.length === 0 ? (
+                <p className="standings-set-empty">Nessun set giocato per questa squadra.</p>
+              ) : (
+                <div className="standings-set-list">
+                  {selectedSetRows.map((match) => (
+                    <article key={match.partita_id} className="standings-set-card">
+                      <div>
+                        <span>Avversaria</span>
+                        <strong>{match.avversaria_nome}</strong>
+                      </div>
+                      <div className="standings-set-card-score">
+                        <span>Set</span>
+                        <strong>{match.set_vinti} / {match.set_persi}</strong>
+                      </div>
+                      <div className="standings-set-card-points">
+                        <span>Punti</span>
+                        <strong>{match.punti_fatti} / {match.punti_subiti}</strong>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

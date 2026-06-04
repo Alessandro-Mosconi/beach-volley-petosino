@@ -11,7 +11,7 @@ interface MatchEvent {
   id: string;
   orario_inizio: string;
   campo: string;
-  opponent: string;
+  detail: string;
   role: 'player' | 'referee' | 'lunch';
   status: string;
 }
@@ -143,22 +143,23 @@ export default function Agenda({ teamId, teams, tournamentId, onTeamChange }: Ag
             id: `lunch-${eventRow.squadra_codice}`,
             orario_inizio: eventRow.orario_inizio,
             campo: '',
-            opponent: 'Pausa programmata',
+            detail: 'Pausa pranzo',
             role: 'lunch',
             status: eventRow.stato ?? 'programmata'
           };
         }
 
         const isReferee = eventRow.tipo_evento === 'ARBITRAGGIO';
-        const opponentName = isReferee
-          ? `${eventRow.squadra_1_nome ?? ''} vs ${eventRow.squadra_2_nome ?? ''}`
-          : eventRow.squadra_avversaria_nome ?? '';
+        const matchup =
+          eventRow.squadra_1_nome && eventRow.squadra_2_nome
+            ? `${eventRow.squadra_1_nome} vs ${eventRow.squadra_2_nome}`
+            : eventRow.squadra_avversaria_nome ?? 'Partita';
 
         return {
           id: `${eventRow.tipo_evento}-${eventRow.partita_id}`,
           orario_inizio: eventRow.orario_inizio,
           campo: eventRow.campo_nome ?? '',
-          opponent: opponentName,
+          detail: matchup,
           role: isReferee ? 'referee' : 'player',
           status: eventRow.stato ?? ''
         };
@@ -222,6 +223,9 @@ export default function Agenda({ teamId, teams, tournamentId, onTeamChange }: Ag
     });
   };
 
+  const shouldShowStatus = (event: MatchEvent) =>
+    event.role !== 'lunch' && event.status.trim().toLowerCase() !== 'programmata';
+
   return (
     <div className="agenda-view">
       <div className="agenda-heading">
@@ -282,21 +286,19 @@ export default function Agenda({ teamId, teams, tournamentId, onTeamChange }: Ag
               </div>
               <div className="agenda-event-body">
                 <div className="agenda-event-header">
-                  <div>
-                    <div className="agenda-event-topline">
-                      <span className={`agenda-event-badge agenda-event-badge-${e.role}`}>
-                        <AgendaIcon name={EVENT_META[e.role].icon} />
-                        {EVENT_META[e.role].label}
-                      </span>
-                    </div>
-                    <h3>{EVENT_META[e.role].title}</h3>
+                  <div className="agenda-event-toprow">
+                    <span className={`agenda-event-badge agenda-event-badge-${e.role}`}>
+                      <AgendaIcon name={EVENT_META[e.role].icon} />
+                      {EVENT_META[e.role].label}
+                    </span>
+                    {shouldShowStatus(e) && (
+                      <span className="agenda-status"><AgendaIcon name="pulse" />{e.status}</span>
+                    )}
                   </div>
-                  {e.status && <span className="agenda-status"><AgendaIcon name="pulse" />{e.status}</span>}
+                  <h3>{e.detail}</h3>
                 </div>
-                <p>{e.role === 'lunch' ? e.opponent : `${e.role === 'referee' ? 'Arbitro per' : 'Contro'}: ${e.opponent}`}</p>
                 <div className="agenda-event-meta">
                   {e.campo && <span><AgendaIcon name="mapPin" />{e.campo}</span>}
-                  <span><AgendaIcon name={EVENT_META[e.role].icon} />{EVENT_META[e.role].eyebrow}</span>
                 </div>
               </div>
             </li>

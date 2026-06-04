@@ -553,18 +553,20 @@ ul li {
 }
 
 .agenda-event-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem;
+  display: grid;
+  gap: 0.42rem;
 }
 
-.agenda-event-topline,
+.agenda-event-toprow,
 .agenda-event-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
   align-items: center;
+}
+
+.agenda-event-toprow {
+  justify-content: space-between;
 }
 
 .agenda-event-badge,
@@ -898,9 +900,51 @@ ul li {
 
 .standings-table td:nth-child(2) {
   min-width: 0;
+}
+
+.standings-table td:nth-child(2),
+.standings-team-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.standings-table td:nth-child(2) {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.standings-team-name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.standings-row-gold {
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.standings-row-silver {
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.standings-qualification {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 0.12rem 0.42rem;
+  font-size: 0.68rem;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
+.standings-qualification-gold {
+  background: rgba(245, 158, 11, 0.22);
+  color: var(--agenda-referee);
+}
+
+.standings-qualification-silver {
+  background: rgba(148, 163, 184, 0.2);
+  color: var(--muted-text);
 }
 
 .standings-col-pos {
@@ -921,6 +965,38 @@ ul li {
 
 .standings-col-points {
   width: 86px;
+}
+
+.team-stats-view {
+  display: grid;
+  gap: 1rem;
+}
+
+.team-stats-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.team-stats-heading h2 {
+  margin-bottom: 0;
+}
+
+.stats-team-select {
+  color: var(--muted-text);
+  margin: 0;
+  white-space: nowrap;
+}
+
+.stats-team-select select {
+  min-width: 220px;
+}
+
+.team-stats-position {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .courts-view {
@@ -1110,7 +1186,7 @@ ul li {
 
 .court-match-topline {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 0.55rem;
   color: var(--muted-text);
   font-size: 0.78rem;
@@ -1140,6 +1216,13 @@ ul li {
 
 .court-match-teams span:last-child {
   text-align: right;
+}
+
+.court-match-team-winner {
+  color: var(--agenda-lunch);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.18em;
 }
 
 .court-match-teams small {
@@ -1464,6 +1547,12 @@ ul li {
     gap: 0.75rem;
   }
 
+  .team-stats-heading {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
   .agenda-heading-actions {
     flex-direction: column;
     align-items: stretch;
@@ -1477,6 +1566,17 @@ ul li {
   }
 
   .agenda-team-select select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .stats-team-select {
+    display: grid;
+    gap: 0.35rem;
+    width: 100%;
+  }
+
+  .stats-team-select select {
     width: 100%;
     min-width: 0;
   }
@@ -1501,6 +1601,10 @@ ul li {
 
   .agenda-event-header {
     align-items: flex-start;
+  }
+
+  .agenda-status {
+    justify-self: start;
   }
 
   .bracket-heading {

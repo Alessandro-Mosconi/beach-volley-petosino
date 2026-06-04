@@ -100,6 +100,35 @@ function formatSetList(sets: MatchSet[]) {
     .join(' / ');
 }
 
+function shouldShowMatchStatus(status: string) {
+  return status.trim().toLowerCase() !== 'programmata';
+}
+
+function formatMatchStatus(status: string) {
+  switch (status.trim().toLowerCase()) {
+    case 'in_corso':
+      return 'In corso';
+    case 'terminata':
+      return 'Terminata';
+    default:
+      return status;
+  }
+}
+
+function getWinningSide(sets: MatchSet[]) {
+  const setWins = sets.reduce(
+    (wins, set) => {
+      if (set.punteggio_squadra_1 > set.punteggio_squadra_2) return { ...wins, team1: wins.team1 + 1 };
+      if (set.punteggio_squadra_2 > set.punteggio_squadra_1) return { ...wins, team2: wins.team2 + 1 };
+      return wins;
+    },
+    { team1: 0, team2: 0 }
+  );
+
+  if (setWins.team1 === setWins.team2) return null;
+  return setWins.team1 > setWins.team2 ? 'team1' : 'team2';
+}
+
 function MatchCell({
   match,
   sets,
@@ -121,21 +150,21 @@ function MatchCell({
     ? 'Organizzazione'
     : match.squadra_arbitro_nome ?? 'Da definire';
   const setList = formatSetList(sets);
+  const winningSide = getWinningSide(sets);
 
   return (
     <article className={`court-match-card court-match-card-${match.stato}`}>
       <div className="court-match-topline">
-        <span>{match.campo_nome}</span>
         <strong>{formatRound(match)}</strong>
       </div>
       <div className="court-match-teams">
-        <span>{match.squadra_1_nome}</span>
+        <span className={winningSide === 'team1' ? 'court-match-team-winner' : undefined}>{match.squadra_1_nome}</span>
         <small>vs</small>
-        <span>{match.squadra_2_nome}</span>
+        <span className={winningSide === 'team2' ? 'court-match-team-winner' : undefined}>{match.squadra_2_nome}</span>
       </div>
       <div className="court-match-details">
         <span>Arbitro: {referee}</span>
-        <span>Stato: {match.stato}</span>
+        {shouldShowMatchStatus(match.stato) && <span>{formatMatchStatus(match.stato)}</span>}
         {setList && <span>Set: {setList}</span>}
       </div>
       {canEdit && (
@@ -180,7 +209,7 @@ interface MatchesByCourtProps {
 function createSetDrafts(sets: MatchSet[]): SetDraft[] {
   const sortedSets = sets.slice().sort((a, b) => a.numero_set - b.numero_set);
   if (sortedSets.length === 0) {
-    return [{ numero_set: 1, punteggio_squadra_1: '', punteggio_squadra_2: '' }];
+    return [{ numero_set: 1, punteggio_squadra_1: '0', punteggio_squadra_2: '0' }];
   }
 
   return sortedSets.map((set, index) => ({
@@ -431,7 +460,7 @@ function ResultEditor({
   const addSet = () => {
     setDrafts((currentDrafts) => [
       ...currentDrafts,
-      { numero_set: currentDrafts.length + 1, punteggio_squadra_1: '', punteggio_squadra_2: '' }
+      { numero_set: currentDrafts.length + 1, punteggio_squadra_1: '0', punteggio_squadra_2: '0' }
     ]);
   };
 

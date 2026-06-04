@@ -459,7 +459,12 @@ export default function App() {
         {view === 'gold' && <Bracket faseName="GOLD" tournamentId={activeTournament.id} />}
         {view === 'silver' && <Bracket faseName="SILVER" tournamentId={activeTournament.id} />}
         {view === 'stats' && selectedTeam && (
-          <TeamStats teamId={selectedTeam} teams={teams} tournamentId={activeTournament.id} />
+          <TeamStats
+            teamId={selectedTeam}
+            teams={teams}
+            tournamentId={activeTournament.id}
+            onTeamChange={setSelectedTeam}
+          />
         )}
         {view === 'info_service' && <InfoService />}
       </div>

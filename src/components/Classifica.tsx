@@ -20,6 +20,13 @@ interface TeamRow {
   girone_nome: string;
 }
 
+function getQualificationTier(position: number | null) {
+  if (position === null) return null;
+  if (position <= 2) return 'gold';
+  if (position <= 4) return 'silver';
+  return null;
+}
+
 export default function Classifica({ faseName, tournamentId }: ClassificaProps) {
   const [rows, setRows] = useState<TeamRow[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -215,19 +222,32 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
                   </tr>
                 </thead>
                 <tbody>
-                  {groups[gironeCodice].map((row) => (
-                    <tr key={row.squadra_codice}>
-                      <td>{row.posizione ?? '-'}</td>
-                      <td>{row.squadra_nome}</td>
-                      <td>{row.partite_giocate}</td>
-                      <td>{row.partite_vinte}</td>
-                      <td>{row.partite_perse}</td>
-                      <td>
-                        {row.set_vinti} / {row.set_persi}
-                      </td>
-                      <td>{row.punti_classifica}</td>
-                    </tr>
-                  ))}
+                  {groups[gironeCodice].map((row) => {
+                    const qualificationTier = getQualificationTier(row.posizione);
+                    return (
+                      <tr
+                        key={row.squadra_codice}
+                        className={qualificationTier ? `standings-row-${qualificationTier}` : undefined}
+                      >
+                        <td>{row.posizione ?? '-'}</td>
+                        <td>
+                          <span className="standings-team-name">{row.squadra_nome}</span>
+                          {qualificationTier && (
+                            <span className={`standings-qualification standings-qualification-${qualificationTier}`}>
+                              {qualificationTier === 'gold' ? 'Gold' : 'Silver'}
+                            </span>
+                          )}
+                        </td>
+                        <td>{row.partite_giocate}</td>
+                        <td>{row.partite_vinte}</td>
+                        <td>{row.partite_perse}</td>
+                        <td>
+                          {row.set_vinti} / {row.set_persi}
+                        </td>
+                        <td>{row.punti_classifica}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

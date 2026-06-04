@@ -18,6 +18,9 @@
 -- =====================================================
 
 drop view if exists v_agenda_squadra cascade;
+drop view if exists v_classifica_finale_silver cascade;
+drop view if exists v_classifica_finale_gold cascade;
+drop view if exists v_classifica_finale cascade;
 drop view if exists v_classifica_silver cascade;
 drop view if exists v_classifica_gold cascade;
 drop view if exists v_classifica_girone_d cascade;
@@ -726,6 +729,105 @@ where fase_torneo_codice = 'SILVER'
 order by posizione;
 
 -- =====================================================
+-- VIEW CLASSIFICA FINALE TABELLONI
+-- Disponibile quando finale e finalina hanno vincitore/perdente.
+-- =====================================================
+
+create or replace view v_classifica_finale as
+with partite_finali as (
+    select *
+    from v_partita_risultato
+    where fase_torneo_codice in ('GOLD', 'SILVER')
+      and slot_tabellone in ('FINALE', 'FINALINA')
+      and squadra_vincitrice_codice is not null
+      and squadra_perdente_codice is not null
+),
+finali as (
+    select *
+    from partite_finali
+    where slot_tabellone = 'FINALE'
+),
+finaline as (
+    select *
+    from partite_finali
+    where slot_tabellone = 'FINALINA'
+)
+select
+    f.torneo_id,
+    f.fase_torneo_codice,
+    1::integer as posizione,
+    f.squadra_vincitrice_codice as squadra_codice,
+    f.squadra_vincitrice_nome as squadra_nome,
+    f.partita_id,
+    f.slot_tabellone,
+    'Vincente finale'::text as descrizione
+from finali f
+join finaline ff
+    on ff.torneo_id = f.torneo_id
+   and ff.fase_torneo_codice = f.fase_torneo_codice
+
+union all
+
+select
+    f.torneo_id,
+    f.fase_torneo_codice,
+    2::integer as posizione,
+    f.squadra_perdente_codice as squadra_codice,
+    f.squadra_perdente_nome as squadra_nome,
+    f.partita_id,
+    f.slot_tabellone,
+    'Finalista'::text as descrizione
+from finali f
+join finaline ff
+    on ff.torneo_id = f.torneo_id
+   and ff.fase_torneo_codice = f.fase_torneo_codice
+
+union all
+
+select
+    ff.torneo_id,
+    ff.fase_torneo_codice,
+    3::integer as posizione,
+    ff.squadra_vincitrice_codice as squadra_codice,
+    ff.squadra_vincitrice_nome as squadra_nome,
+    ff.partita_id,
+    ff.slot_tabellone,
+    'Vincente finalina'::text as descrizione
+from finaline ff
+join finali f
+    on f.torneo_id = ff.torneo_id
+   and f.fase_torneo_codice = ff.fase_torneo_codice
+
+union all
+
+select
+    ff.torneo_id,
+    ff.fase_torneo_codice,
+    4::integer as posizione,
+    ff.squadra_perdente_codice as squadra_codice,
+    ff.squadra_perdente_nome as squadra_nome,
+    ff.partita_id,
+    ff.slot_tabellone,
+    'Quarto posto'::text as descrizione
+from finaline ff
+join finali f
+    on f.torneo_id = ff.torneo_id
+   and f.fase_torneo_codice = ff.fase_torneo_codice
+order by torneo_id, fase_torneo_codice, posizione;
+
+create or replace view v_classifica_finale_gold as
+select *
+from v_classifica_finale
+where fase_torneo_codice = 'GOLD'
+order by torneo_id, posizione;
+
+create or replace view v_classifica_finale_silver as
+select *
+from v_classifica_finale
+where fase_torneo_codice = 'SILVER'
+order by torneo_id, posizione;
+
+-- =====================================================
 -- VIEW AGENDA SQUADRA
 -- Include:
 -- - partite da giocare
@@ -924,6 +1026,9 @@ grant select on
     v_classifica_girone_d,
     v_classifica_gold,
     v_classifica_silver,
+    v_classifica_finale,
+    v_classifica_finale_gold,
+    v_classifica_finale_silver,
     v_agenda_squadra
 to anon, authenticated;
 

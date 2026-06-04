@@ -320,7 +320,7 @@ export default function App() {
 
       const { data, error } = await supabase
         .from('v_partita_risultato')
-        .select('fase_torneo_codice, slot_tabellone, squadra_vincitrice_codice, squadra_perdente_codice, stato')
+        .select('fase_torneo_codice, slot_tabellone, squadra_vincitrice_codice, squadra_perdente_codice')
         .eq('torneo_id', activeTournament.id)
         .in('fase_torneo_codice', ['GOLD', 'SILVER'])
         .in('slot_tabellone', ['FINALE', 'FINALINA']);
@@ -336,7 +336,6 @@ export default function App() {
           phaseMatches.some(
             (match) =>
               match.slot_tabellone === slot &&
-              match.stato === 'terminata' &&
               match.squadra_vincitrice_codice &&
               match.squadra_perdente_codice
           )

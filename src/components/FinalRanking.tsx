@@ -6,59 +6,27 @@ interface FinalRankingProps {
   tournamentId: number;
 }
 
-interface FinalMatch {
-  slot_tabellone: string | null;
-  squadra_vincitrice_nome: string | null;
-  squadra_perdente_nome: string | null;
-  stato: string | null;
-}
-
-interface RankingRow {
-  position: number;
-  teamName: string;
-  source: string;
-}
-
-function buildRanking(matches: FinalMatch[]): RankingRow[] | null {
-  const finalMatch = matches.find((match) => match.slot_tabellone === 'FINALE');
-  const thirdPlaceMatch = matches.find((match) => match.slot_tabellone === 'FINALINA');
-
-  if (
-    !finalMatch ||
-    finalMatch.stato !== 'terminata' ||
-    !finalMatch?.squadra_vincitrice_nome ||
-    !finalMatch.squadra_perdente_nome ||
-    !thirdPlaceMatch ||
-    thirdPlaceMatch.stato !== 'terminata' ||
-    !thirdPlaceMatch?.squadra_vincitrice_nome ||
-    !thirdPlaceMatch.squadra_perdente_nome
-  ) {
-    return null;
-  }
-
-  return [
-    { position: 1, teamName: finalMatch.squadra_vincitrice_nome, source: 'Vincente finale' },
-    { position: 2, teamName: finalMatch.squadra_perdente_nome, source: 'Finalista' },
-    { position: 3, teamName: thirdPlaceMatch.squadra_vincitrice_nome, source: 'Vincente finalina' },
-    { position: 4, teamName: thirdPlaceMatch.squadra_perdente_nome, source: 'Quarto posto' }
-  ];
+interface FinalRankingRow {
+  posizione: number;
+  squadra_nome: string;
+  descrizione: string;
 }
 
 export default function FinalRanking({ faseName, tournamentId }: FinalRankingProps) {
-  const [ranking, setRanking] = useState<RankingRow[] | null>(null);
+  const [ranking, setRanking] = useState<FinalRankingRow[] | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchRanking() {
       setLoading(true);
       const { data, error } = await supabase
-        .from('v_partita_risultato')
-        .select('slot_tabellone, squadra_vincitrice_nome, squadra_perdente_nome, stato')
+        .from('v_classifica_finale')
+        .select('posizione, squadra_nome, descrizione')
         .eq('torneo_id', tournamentId)
         .eq('fase_torneo_codice', faseName)
-        .in('slot_tabellone', ['FINALE', 'FINALINA']);
+        .order('posizione', { ascending: true });
 
-      setRanking(error || !data ? null : buildRanking(data as FinalMatch[]));
+      setRanking(error || !data || data.length === 0 ? null : (data as FinalRankingRow[]));
       setLoading(false);
     }
 
@@ -85,10 +53,10 @@ export default function FinalRanking({ faseName, tournamentId }: FinalRankingPro
       ) : (
         <ol className="final-ranking-list">
           {ranking.map((row) => (
-            <li key={row.position} className={`final-ranking-row final-ranking-row-${row.position}`}>
-              <span className="final-ranking-position">{row.position}</span>
-              <strong>{row.teamName}</strong>
-              <span>{row.source}</span>
+            <li key={row.posizione} className={`final-ranking-row final-ranking-row-${row.posizione}`}>
+              <span className="final-ranking-position">{row.posizione}</span>
+              <strong>{row.squadra_nome}</strong>
+              <span>{row.descrizione}</span>
             </li>
           ))}
         </ol>

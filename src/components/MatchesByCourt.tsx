@@ -26,6 +26,7 @@ interface CourtMatch {
   partita_id: number;
   fase_torneo_codice: string;
   girone_codice: string | null;
+  slot_tabellone: string | null;
   campo_codice: string;
   campo_nome: string;
   orario_inizio: string;
@@ -55,6 +56,16 @@ type SetDraft = {
   punteggio_squadra_2: string;
 };
 
+const BRACKET_SLOT_OPTIONS = [
+  { value: 'QUARTI_1', label: 'Quarto 1' },
+  { value: 'QUARTI_2', label: 'Quarto 2' },
+  { value: 'QUARTI_3', label: 'Quarto 3' },
+  { value: 'QUARTI_4', label: 'Quarto 4' },
+  { value: 'SEMIFINALE_1', label: 'Semifinale 1' },
+  { value: 'SEMIFINALE_2', label: 'Semifinale 2' },
+  { value: 'FINALE', label: 'Finale' }
+];
+
 interface LunchEvent {
   squadra_codice: string;
   squadra_nome: string;
@@ -72,6 +83,10 @@ function formatTime(value: string) {
 function formatRound(match: CourtMatch) {
   if (match.fase_torneo_codice === 'GIRONI' && match.girone_codice) {
     return match.girone_codice.replace('GIRONE_', 'Girone ');
+  }
+  const bracketSlot = BRACKET_SLOT_OPTIONS.find((slot) => slot.value === match.slot_tabellone);
+  if (bracketSlot) {
+    return `${match.fase_torneo_codice} - ${bracketSlot.label}`;
   }
   return match.fase_torneo_codice;
 }
@@ -208,6 +223,7 @@ function MatchEditor({
     torneo_id: number;
     fase_torneo_codice: string;
     girone_codice: string | null;
+    slot_tabellone: string | null;
     campo_codice: string;
     orario_inizio: string;
     squadra_1_codice: string;
@@ -219,6 +235,7 @@ function MatchEditor({
 }) {
   const [fase, setFase] = useState(match?.fase_torneo_codice ?? phases[0]?.codice ?? 'GIRONI');
   const [girone, setGirone] = useState(match?.girone_codice ?? '');
+  const [slotTabellone, setSlotTabellone] = useState(match?.slot_tabellone ?? '');
   const [campo, setCampo] = useState(match?.campo_codice ?? courts[0]?.codice ?? '');
   const [orario, setOrario] = useState(match ? toDateTimeInputValue(match.orario_inizio) : '');
   const [squadra1, setSquadra1] = useState(match?.squadra_1_codice ?? teams[0]?.codice ?? '');
@@ -230,6 +247,7 @@ function MatchEditor({
   useEffect(() => {
     setFase(match?.fase_torneo_codice ?? phases[0]?.codice ?? 'GIRONI');
     setGirone(match?.girone_codice ?? '');
+    setSlotTabellone(match?.slot_tabellone ?? '');
     setCampo(match?.campo_codice ?? courts[0]?.codice ?? '');
     setOrario(match ? toDateTimeInputValue(match.orario_inizio) : '');
     setSquadra1(match?.squadra_1_codice ?? teams[0]?.codice ?? '');
@@ -248,7 +266,8 @@ function MatchEditor({
           onSave({
             torneo_id: tournamentId,
             fase_torneo_codice: fase,
-            girone_codice: girone || null,
+            girone_codice: fase === 'GIRONI' ? girone || null : null,
+            slot_tabellone: fase === 'GOLD' || fase === 'SILVER' ? slotTabellone || null : null,
             campo_codice: campo,
             orario_inizio: new Date(orario).toISOString(),
             squadra_1_codice: squadra1,
@@ -278,15 +297,27 @@ function MatchEditor({
               ))}
             </select>
           </label>
-          <label>
-            Girone
-            <select value={girone} onChange={(event) => setGirone(event.target.value)}>
-              <option value="">Nessuno</option>
-              {groups.map((group) => (
-                <option key={group.codice} value={group.codice}>{group.nome}</option>
-              ))}
-            </select>
-          </label>
+          {fase === 'GIRONI' ? (
+            <label>
+              Girone
+              <select value={girone} onChange={(event) => setGirone(event.target.value)}>
+                <option value="">Nessuno</option>
+                {groups.map((group) => (
+                  <option key={group.codice} value={group.codice}>{group.nome}</option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <label>
+              Slot tabellone
+              <select value={slotTabellone} onChange={(event) => setSlotTabellone(event.target.value)} required>
+                <option value="">Scegli slot</option>
+                {BRACKET_SLOT_OPTIONS.map((slot) => (
+                  <option key={slot.value} value={slot.value}>{slot.label}</option>
+                ))}
+              </select>
+            </label>
+          )}
           <label>
             Campo
             <select value={campo} onChange={(event) => setCampo(event.target.value)} required>
@@ -580,7 +611,7 @@ export default function MatchesByCourt({ tournamentId, canEdit }: MatchesByCourt
         supabase
           .from('v_partita_risultato')
           .select(
-            'partita_id, fase_torneo_codice, girone_codice, campo_codice, campo_nome, orario_inizio, squadra_1_codice, squadra_2_codice, squadra_1_nome, squadra_2_nome, squadra_arbitro_codice, squadra_arbitro_nome, arbitro_organizzazione, risultato_set, stato, note'
+            'partita_id, fase_torneo_codice, girone_codice, slot_tabellone, campo_codice, campo_nome, orario_inizio, squadra_1_codice, squadra_2_codice, squadra_1_nome, squadra_2_nome, squadra_arbitro_codice, squadra_arbitro_nome, arbitro_organizzazione, risultato_set, stato, note'
           )
           .eq('torneo_id', tournamentId)
           .order('orario_inizio', { ascending: true })
@@ -736,6 +767,7 @@ export default function MatchesByCourt({ tournamentId, canEdit }: MatchesByCourt
     torneo_id: number;
     fase_torneo_codice: string;
     girone_codice: string | null;
+    slot_tabellone: string | null;
     campo_codice: string;
     orario_inizio: string;
     squadra_1_codice: string;
@@ -758,6 +790,12 @@ export default function MatchesByCourt({ tournamentId, canEdit }: MatchesByCourt
       [values.squadra_1_codice, values.squadra_2_codice].includes(values.squadra_arbitro_codice)
     ) {
       setSaveError('La squadra arbitro non puo\' essere una delle due squadre in campo.');
+      setSaving(false);
+      return;
+    }
+
+    if ((values.fase_torneo_codice === 'GOLD' || values.fase_torneo_codice === 'SILVER') && !values.slot_tabellone) {
+      setSaveError('Scegli lo slot tabellone per le fasi Gold/Silver.');
       setSaving(false);
       return;
     }
@@ -796,6 +834,7 @@ export default function MatchesByCourt({ tournamentId, canEdit }: MatchesByCourt
     }
 
     setSaving(false);
+    setEditingMatchDetails(undefined);
   };
 
   const scheduleRows = useMemo(() => {
@@ -836,8 +875,14 @@ export default function MatchesByCourt({ tournamentId, canEdit }: MatchesByCourt
           <p>{canEdit ? 'Tocca Risultato su una partita per aggiornare set e stato.' : 'Partite affiancate per orario, con squadre e arbitraggio.'}</p>
         </div>
         {canEdit && (
-          <button type="button" onClick={() => setEditingMatchDetails(null)}>
-            Nuova partita
+          <button
+            className="add-match-button"
+            type="button"
+            aria-label="Nuova partita"
+            title="Nuova partita"
+            onClick={() => setEditingMatchDetails(null)}
+          >
+            <span aria-hidden="true">+</span>
           </button>
         )}
       </div>

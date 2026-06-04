@@ -8,6 +8,7 @@ interface BracketProps {
 
 interface MatchData {
   id: number;
+  slot_tabellone: string | null;
   squadra_1_codice: string | null;
   squadra_2_codice: string | null;
   squadra_1_nome: string;
@@ -50,10 +51,21 @@ const GRAPH_EDGES = [
   { from: 5, to: 6, path: 'M 584 531 H 634 V 357 H 688' }
 ];
 
+const SLOT_INDEX_BY_CODE: Record<string, number> = {
+  QUARTI_1: 0,
+  QUARTI_2: 1,
+  QUARTI_3: 2,
+  QUARTI_4: 3,
+  SEMIFINALE_1: 4,
+  SEMIFINALE_2: 5,
+  FINALE: 6
+};
+
 function createEmptySlot(slotIndex: number): BracketSlot {
   return {
     id: -100 - slotIndex,
     slotIndex,
+    slot_tabellone: null,
     squadra_1_codice: null,
     squadra_2_codice: null,
     squadra_1_nome: '',
@@ -68,9 +80,26 @@ function createEmptySlot(slotIndex: number): BracketSlot {
 
 function createSlots(matches: MatchData[]): BracketSlot[] {
   const slots = Array.from({ length: 7 }, (_, index) => createEmptySlot(index));
-  matches.slice(0, 7).forEach((match, index) => {
-    slots[index] = { ...match, slotIndex: index };
+  const usedSlots = new Set<number>();
+
+  matches.forEach((match) => {
+    if (!match.slot_tabellone) return;
+    const slotIndex = SLOT_INDEX_BY_CODE[match.slot_tabellone];
+    if (slotIndex === undefined) return;
+    slots[slotIndex] = { ...match, slotIndex };
+    usedSlots.add(slotIndex);
   });
+
+  matches
+    .filter((match) => !match.slot_tabellone)
+    .slice(0, 7)
+    .forEach((match) => {
+      const slotIndex = slots.findIndex((slot, index) => slot.id < 0 && !usedSlots.has(index));
+      if (slotIndex === -1) return;
+      slots[slotIndex] = { ...match, slotIndex };
+      usedSlots.add(slotIndex);
+  });
+
   return slots;
 }
 
@@ -115,7 +144,7 @@ export default function Bracket({ faseName, tournamentId }: BracketProps) {
       const { data: partite, error: partitaErr } = await supabase
         .from('v_partita_risultato')
         .select(
-          'partita_id, squadra_1_codice, squadra_1_nome, squadra_2_codice, squadra_2_nome, squadra_vincitrice_codice, orario_inizio, campo_nome, set_vinti_squadra_1, set_vinti_squadra_2'
+          'partita_id, slot_tabellone, squadra_1_codice, squadra_1_nome, squadra_2_codice, squadra_2_nome, squadra_vincitrice_codice, orario_inizio, campo_nome, set_vinti_squadra_1, set_vinti_squadra_2'
         )
         .eq('torneo_id', tournamentId)
         .eq('fase_torneo_codice', faseName)
@@ -131,6 +160,7 @@ export default function Bracket({ faseName, tournamentId }: BracketProps) {
 
       const matchData: MatchData[] = partite.map((partita) => ({
         id: partita.partita_id,
+        slot_tabellone: partita.slot_tabellone ?? null,
         squadra_1_codice: partita.squadra_1_codice,
         squadra_2_codice: partita.squadra_2_codice,
         squadra_1_nome: partita.squadra_1_nome ?? '',

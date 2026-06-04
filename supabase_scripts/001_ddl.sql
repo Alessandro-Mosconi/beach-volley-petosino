@@ -253,6 +253,7 @@ create table partita (
     torneo_id integer not null references torneo(id) on delete cascade,
     fase_torneo_codice text not null references fase_torneo(codice),
     girone_codice text references girone(codice) on delete set null,
+    slot_tabellone text,
     campo_codice text not null references campo(codice),
     orario_inizio timestamp with time zone not null,
     squadra_1_codice text not null references squadra(codice),
@@ -265,6 +266,26 @@ create table partita (
 
     constraint chk_partita_squadre_diverse
         check (squadra_1_codice <> squadra_2_codice),
+
+    constraint chk_partita_slot_tabellone_fase
+        check (
+            slot_tabellone is null
+            or fase_torneo_codice in ('GOLD', 'SILVER')
+        ),
+
+    constraint chk_partita_slot_tabellone_valido
+        check (
+            slot_tabellone is null
+            or slot_tabellone in (
+                'QUARTI_1',
+                'QUARTI_2',
+                'QUARTI_3',
+                'QUARTI_4',
+                'SEMIFINALE_1',
+                'SEMIFINALE_2',
+                'FINALE'
+            )
+        ),
 
     constraint chk_partita_arbitro_non_giocatore
         check (
@@ -296,6 +317,10 @@ create table partita (
             or squadra_vincitrice_codice <> squadra_perdente_codice
     )
 );
+
+create unique index uq_partita_slot_tabellone
+on partita (torneo_id, fase_torneo_codice, slot_tabellone)
+where slot_tabellone is not null;
 
 -- Trigger validazione vincitore/perdente partita
 create or replace function trg_partita_validate_vincitore_fn()
@@ -493,6 +518,7 @@ select
     p.torneo_id,
     p.fase_torneo_codice,
     p.girone_codice,
+    p.slot_tabellone,
     p.campo_codice,
     c.nome as campo_nome,
     p.orario_inizio,
@@ -531,7 +557,7 @@ left join squadra sv on sv.codice = p.squadra_vincitrice_codice
 left join squadra sp on sp.codice = p.squadra_perdente_codice
 left join partita_set ps on ps.partita_id = p.id
 group by
-    p.id, p.torneo_id, p.fase_torneo_codice, p.girone_codice, p.campo_codice,
+    p.id, p.torneo_id, p.fase_torneo_codice, p.girone_codice, p.slot_tabellone, p.campo_codice,
     c.nome, p.orario_inizio,
     p.squadra_1_codice, s1.nome, p.squadra_2_codice, s2.nome,
     p.squadra_arbitro_codice, sa.nome,
@@ -550,6 +576,7 @@ select
     r.torneo_id,
     r.fase_torneo_codice,
     r.girone_codice,
+    r.slot_tabellone,
     r.campo_codice,
     r.campo_nome,
     r.orario_inizio,
@@ -578,6 +605,7 @@ select
     r.torneo_id,
     r.fase_torneo_codice,
     r.girone_codice,
+    r.slot_tabellone,
     r.campo_codice,
     r.campo_nome,
     r.orario_inizio,

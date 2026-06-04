@@ -66,7 +66,7 @@ Per distribuire l'applicazione su Vercel:
 
 ## Modifiche al database
 
-Sono forniti quattro script SQL nella cartella `supabase_scripts`:
+Sono forniti cinque script SQL nella cartella `supabase_scripts`:
 
 * **001_create_schema.sql**: crea tutte le tabelle necessarie (`torneo`, `campo`, `squadra`, `girone`, `girone_squadra`, `fase_torneo`, `partita`, `partita_set`, `classifica`, `qualificazione_fase`) e inserisce le fasi base (`GIRONI`, `GOLD`, `SILVER`) e tre campi di esempio. Usa questo script se parti da un database vuoto.
 
@@ -76,12 +76,15 @@ Sono forniti quattro script SQL nella cartella `supabase_scripts`:
 
 * **004_remove_turno_partita.sql**: rimuove la colonna `turno` dalla tabella `partita` e ricrea le view dipendenti senza quel campo.
 
+* **005_add_slot_tabellone.sql**: aggiunge `slot_tabellone` a `partita` per assegnare le partite GOLD/SILVER a slot precisi del tabellone, come `QUARTI_1`, `SEMIFINALE_2` o `FINALE`.
+
 Per applicare gli script su Supabase puoi utilizzare la sezione **SQL Editor** della dashboard:
 
 1. Carica e esegui `001_create_schema.sql` per creare lo schema da zero. Se il tuo database esiste già, passa direttamente allo script di aggiornamento.
 2. Carica e esegui `002_alter_schema.sql` per allineare la struttura alle modifiche più recenti. Gli script sono idempotenti: se i vincoli o le tabelle esistono già, non verranno duplicati.
 3. Carica e esegui `003_operatori_risultati.sql` se vuoi limitare la scrittura dei risultati agli operatori autorizzati.
 4. Carica e esegui `004_remove_turno_partita.sql` se il database esistente contiene ancora la colonna `turno` in `partita`.
+5. Carica e esegui `005_add_slot_tabellone.sql` se vuoi usare slot espliciti per quarti, semifinali e finali Gold/Silver.
 
 ### Ordine degli script
 
@@ -91,6 +94,7 @@ Gli script sono numerati secondo l'ordine con cui dovrebbero essere eseguiti:
 2. **002_alter_schema.sql** – aggiorna lo schema (opzionale, solo se necessario).
 3. **003_operatori_risultati.sql** – abilita i permessi di scrittura selettivi.
 4. **004_remove_turno_partita.sql** – rimuove il campo `turno` e aggiorna le view.
+5. **005_add_slot_tabellone.sql** – aggiunge gli slot tabellone Gold/Silver.
 
 ### Autorizzare chi inserisce risultati
 

@@ -770,6 +770,25 @@ ul li {
   color: var(--muted-text);
 }
 
+.add-match-button {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border-color: var(--agenda-lunch);
+  background: var(--agenda-lunch);
+  color: var(--input-bg);
+  font-size: 1.45rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.add-match-button span {
+  transform: translateY(-1px);
+  line-height: 1;
+}
+
 .courts-grid {
   display: grid;
   grid-template-columns: 96px repeat(var(--court-count), minmax(310px, 1fr));

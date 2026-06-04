@@ -5,14 +5,15 @@ import Classifica from './components/Classifica';
 import Bracket from './components/Bracket';
 import TeamStats from './components/TeamStats';
 import InfoService from './components/InfoService';
+import MatchesByCourt from './components/MatchesByCourt';
 
 interface Team {
-  id: number;
+  codice: string;
   nome: string;
   orario_pranzo: string | null;
 }
 
-type View = 'agenda' | 'classifica' | 'gold' | 'silver' | 'stats' | 'info_service';
+type View = 'agenda' | 'partite' | 'classifica' | 'gold' | 'silver' | 'stats' | 'info_service';
 type Theme = 'dark' | 'light';
 
 function viewFromPath(pathname: string): View {
@@ -22,6 +23,8 @@ function viewFromPath(pathname: string): View {
       return 'agenda';
     case '/classifica':
       return 'classifica';
+    case '/partite':
+      return 'partite';
     case '/gold':
       return 'gold';
     case '/silver':
@@ -41,6 +44,8 @@ function pathFromView(view: View): string {
       return '/';
     case 'classifica':
       return '/classifica';
+    case 'partite':
+      return '/partite';
     case 'gold':
       return '/gold';
     case 'silver':
@@ -56,7 +61,7 @@ function pathFromView(view: View): string {
 
 export default function App() {
   const [teams, setTeams] = useState<Team[]>([]);
-  const [selectedTeam, setSelectedTeam] = useState<number | null>(null);
+  const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
   const [view, setView] = useState<View>(viewFromPath(window.location.pathname));
   const [loading, setLoading] = useState<boolean>(true);
   const [teamsLoadError, setTeamsLoadError] = useState<string | null>(null);
@@ -91,7 +96,7 @@ export default function App() {
     async function fetchTeams() {
       const { data, error } = await supabase
         .from('squadra')
-        .select('id, nome, orario_pranzo')
+        .select('codice, nome, orario_pranzo')
         .order('nome', { ascending: true });
       if (!error && data) {
         const nextTeams = data as Team[];
@@ -99,10 +104,10 @@ export default function App() {
         setTeamsLoadError(null);
         setSelectedTeam((currentSelected) => {
           if (nextTeams.length === 0) return null;
-          if (currentSelected && nextTeams.some((team) => team.id === currentSelected)) {
+          if (currentSelected && nextTeams.some((team) => team.codice === currentSelected)) {
             return currentSelected;
           }
-          return nextTeams[0].id;
+          return nextTeams[0].codice;
         });
       } else {
         setTeamsLoadError(error?.message ?? 'Errore sconosciuto');
@@ -142,10 +147,10 @@ export default function App() {
           Seleziona squadra:{' '}
           <select
             value={selectedTeam ?? undefined}
-            onChange={(e) => setSelectedTeam(Number(e.target.value))}
+            onChange={(e) => setSelectedTeam(e.target.value)}
           >
             {teams.map((team) => (
-              <option key={team.id} value={team.id}>
+              <option key={team.codice} value={team.codice}>
                 {team.nome}
               </option>
             ))}
@@ -156,6 +161,9 @@ export default function App() {
       <nav className="tab-nav">
         <button onClick={() => goToView('agenda')} disabled={view === 'agenda'}>
           Agenda
+        </button>
+        <button onClick={() => goToView('partite')} disabled={view === 'partite'}>
+          Partite
         </button>
         <button onClick={() => goToView('classifica')} disabled={view === 'classifica'}>
           Classifiche Gironi
@@ -182,6 +190,7 @@ export default function App() {
           <Agenda teamId={selectedTeam} teams={teams} />
         )}
         {view === 'classifica' && <Classifica faseName="GIRONI" />}
+        {view === 'partite' && <MatchesByCourt />}
         {view === 'gold' && <Bracket faseName="GOLD" />}
         {view === 'silver' && <Bracket faseName="SILVER" />}
         {view === 'stats' && selectedTeam && (

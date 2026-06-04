@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../utils/supabase';
 
 interface Team {
-  id: number;
+  codice: string;
   nome: string;
   orario_pranzo: string | null;
 }
 
 interface TeamStatsProps {
-  teamId: number;
+  teamId: string;
   teams: Team[];
 }
 
@@ -27,27 +27,26 @@ interface StatRow {
 export default function TeamStats({ teamId, teams }: TeamStatsProps) {
   const [stats, setStats] = useState<StatRow[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const team = teams.find((t) => t.id === teamId);
+  const team = teams.find((t) => t.codice === teamId);
 
   useEffect(() => {
     async function fetchStats() {
       setLoading(true);
-      // Fetch classification rows for this team across all phases
       const { data, error } = await supabase
-        .from('classifica')
+        .from('v_classifica_ordinata')
         .select(
-          `posizione, partite_giocate, partite_vinte, partite_perse, set_vinti, set_persi, punti_classifica, girone: girone (nome), fase_torneo: fase_torneo (nome)`
+          'fase_nome, girone_nome, posizione, partite_giocate, partite_vinte, partite_perse, set_vinti, set_persi, punti_classifica, fase_torneo_codice'
         )
-        .eq('squadra_id', teamId)
-        .order('fase_torneo_id', { ascending: true });
+        .eq('squadra_codice', teamId)
+        .order('fase_torneo_codice', { ascending: true });
       if (error || !data) {
         setStats([]);
         setLoading(false);
         return;
       }
       const formatted: StatRow[] = data.map((r) => ({
-        fase_nome: r.fase_torneo?.nome ?? '',
-        girone_nome: r.girone?.nome ?? null,
+        fase_nome: r.fase_nome ?? '',
+        girone_nome: r.girone_nome ?? null,
         posizione: r.posizione,
         partite_giocate: r.partite_giocate,
         partite_vinte: r.partite_vinte,
@@ -65,7 +64,12 @@ export default function TeamStats({ teamId, teams }: TeamStatsProps) {
       .channel(`stats-live-${teamId}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'classifica' },
+        { event: '*', schema: 'public', table: 'partita' },
+        () => fetchStats()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'partita_set' },
         () => fetchStats()
       )
       .on(

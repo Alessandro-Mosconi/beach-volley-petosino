@@ -7,7 +7,7 @@ interface ClassificaProps {
 
 interface TeamRow {
   posizione: number | null;
-  squadra_id: number;
+  squadra_codice: string;
   squadra_nome: string;
   partite_giocate: number;
   partite_vinte: number;
@@ -15,7 +15,7 @@ interface TeamRow {
   set_vinti: number;
   set_persi: number;
   punti_classifica: number;
-  girone_id: number;
+  girone_codice: string;
   girone_nome: string;
 }
 
@@ -26,26 +26,12 @@ export default function Classifica({ faseName }: ClassificaProps) {
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
-      // Get phase id
-      const { data: fase, error: faseErr } = await supabase
-        .from('fase_torneo')
-        .select('id')
-        .eq('nome', faseName)
-        .single();
-      if (faseErr || !fase) {
-        setRows([]);
-        setLoading(false);
-        return;
-      }
-      const faseId = fase.id;
-      // Fetch classifica with joins to squadra and girone
       const { data: classificaRows, error } = await supabase
-        .from('classifica')
+        .from('v_classifica_gironi')
         .select(
-          `posizione, squadra_id, partite_giocate, partite_vinte, partite_perse, set_vinti, set_persi, punti_classifica, girone_id, squadra: squadra (nome), girone: girone (nome)`
+          'posizione, squadra_codice, squadra_nome, partite_giocate, partite_vinte, partite_perse, set_vinti, set_persi, punti_classifica, girone_codice, girone_nome'
         )
-        .eq('fase_torneo_id', faseId)
-        .order('girone_id', { ascending: true })
+        .order('girone_codice', { ascending: true })
         .order('posizione', { ascending: true });
       if (error) {
         setRows([]);
@@ -53,51 +39,59 @@ export default function Classifica({ faseName }: ClassificaProps) {
         return;
       }
 
-      const { data: participants, error: participantsError } = await supabase
-        .from('girone_squadra')
-        .select('girone_id, squadra_id, squadra:squadra(nome), girone:girone(nome)');
+      const [participantsRes, squadreRes, gironiRes] = await Promise.all([
+        supabase.from('girone_squadra').select('girone_codice, squadra_codice'),
+        supabase.from('squadra').select('codice, nome'),
+        supabase.from('girone').select('codice, nome')
+      ]);
 
-      if (participantsError) {
+      if (participantsRes.error || squadreRes.error || gironiRes.error) {
         setRows([]);
         setLoading(false);
         return;
       }
 
+      const squadraMap = new Map<string, string>();
+      squadreRes.data?.forEach((s) => squadraMap.set(s.codice, s.nome));
+
+      const gironeMap = new Map<string, string>();
+      gironiRes.data?.forEach((g) => gironeMap.set(g.codice, g.nome));
+
       const classificaMap = new Map<string, TeamRow>();
       (classificaRows ?? []).forEach((r) => {
-        const key = `${r.girone_id}-${r.squadra_id}`;
+        const key = `${r.girone_codice}-${r.squadra_codice}`;
         classificaMap.set(key, {
           posizione: r.posizione,
-          squadra_id: r.squadra_id,
-          squadra_nome: r.squadra?.nome ?? '',
+          squadra_codice: r.squadra_codice,
+          squadra_nome: r.squadra_nome ?? '',
           partite_giocate: r.partite_giocate,
           partite_vinte: r.partite_vinte,
           partite_perse: r.partite_perse,
           set_vinti: r.set_vinti,
           set_persi: r.set_persi,
           punti_classifica: r.punti_classifica,
-          girone_id: r.girone_id,
-          girone_nome: r.girone?.nome ?? ''
+          girone_codice: r.girone_codice,
+          girone_nome: r.girone_nome ?? ''
         });
       });
 
-      const mergedRows: TeamRow[] = (participants ?? []).map((p) => {
-        const key = `${p.girone_id}-${p.squadra_id}`;
+      const mergedRows: TeamRow[] = (participantsRes.data ?? []).map((p) => {
+        const key = `${p.girone_codice}-${p.squadra_codice}`;
         const ranked = classificaMap.get(key);
         if (ranked) return ranked;
 
         return {
           posizione: null,
-          squadra_id: p.squadra_id,
-          squadra_nome: p.squadra?.nome ?? '',
+          squadra_codice: p.squadra_codice,
+          squadra_nome: squadraMap.get(p.squadra_codice) ?? '',
           partite_giocate: 0,
           partite_vinte: 0,
           partite_perse: 0,
           set_vinti: 0,
           set_persi: 0,
           punti_classifica: 0,
-          girone_id: p.girone_id,
-          girone_nome: p.girone?.nome ?? ''
+          girone_codice: p.girone_codice,
+          girone_nome: gironeMap.get(p.girone_codice) ?? ''
         };
       });
 
@@ -105,7 +99,7 @@ export default function Classifica({ faseName }: ClassificaProps) {
       classificaMap.forEach((value) => {
         if (
           !mergedRows.some(
-            (row) => row.girone_id === value.girone_id && row.squadra_id === value.squadra_id
+            (row) => row.girone_codice === value.girone_codice && row.squadra_codice === value.squadra_codice
           )
         ) {
           mergedRows.push(value);
@@ -132,7 +126,12 @@ export default function Classifica({ faseName }: ClassificaProps) {
       .channel(`classifica-live-${faseName}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'classifica' },
+        { event: '*', schema: 'public', table: 'partita' },
+        () => fetchData()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'partita_set' },
         () => fetchData()
       )
       .on(
@@ -203,7 +202,7 @@ export default function Classifica({ faseName }: ClassificaProps) {
                 </thead>
                 <tbody>
                   {groups[gironeNome].map((row) => (
-                    <tr key={row.squadra_id}>
+                    <tr key={row.squadra_codice}>
                       <td style={{ padding: '0.25rem' }}>{row.posizione ?? '-'}</td>
                       <td style={{ padding: '0.25rem' }}>{row.squadra_nome}</td>
                       <td style={{ padding: '0.25rem' }}>{row.partite_giocate}</td>

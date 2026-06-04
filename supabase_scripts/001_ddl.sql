@@ -604,6 +604,30 @@ from v_classifica_ordinata
 where fase_torneo_codice = 'GIRONI'
 order by girone_codice, posizione;
 
+create or replace view v_classifica_girone_a as
+select *
+from v_classifica_gironi
+where girone_codice = 'GIRONE_A'
+order by posizione;
+
+create or replace view v_classifica_girone_b as
+select *
+from v_classifica_gironi
+where girone_codice = 'GIRONE_B'
+order by posizione;
+
+create or replace view v_classifica_girone_c as
+select *
+from v_classifica_gironi
+where girone_codice = 'GIRONE_C'
+order by posizione;
+
+create or replace view v_classifica_girone_d as
+select *
+from v_classifica_gironi
+where girone_codice = 'GIRONE_D'
+order by posizione;
+
 create or replace view v_classifica_gold as
 select *
 from v_classifica_ordinata
@@ -633,40 +657,60 @@ create or replace view v_agenda_squadra as
 select
     p.torneo_id,
     p.squadra_1_codice as squadra_codice,
+    s1.nome as squadra_nome,
     'PARTITA' as tipo_evento,
     p.id as partita_id,
     p.numero_partita,
     p.fase_torneo_codice,
     p.girone_codice,
     p.campo_codice,
+    c.nome as campo_nome,
     p.orario_inizio,
     p.squadra_1_codice,
+    s1.nome as squadra_1_nome,
     p.squadra_2_codice,
+    s2.nome as squadra_2_nome,
     p.squadra_arbitro_codice,
+    sa.nome as squadra_arbitro_nome,
     p.squadra_2_codice as squadra_avversaria_codice,
+    s2.nome as squadra_avversaria_nome,
     p.stato,
     p.note
 from partita p
+join campo c on c.codice = p.campo_codice
+join squadra s1 on s1.codice = p.squadra_1_codice
+join squadra s2 on s2.codice = p.squadra_2_codice
+left join squadra sa on sa.codice = p.squadra_arbitro_codice
 
 union all
 
 select
     p.torneo_id,
     p.squadra_2_codice as squadra_codice,
+    s2.nome as squadra_nome,
     'PARTITA' as tipo_evento,
     p.id as partita_id,
     p.numero_partita,
     p.fase_torneo_codice,
     p.girone_codice,
     p.campo_codice,
+    c.nome as campo_nome,
     p.orario_inizio,
     p.squadra_1_codice,
+    s1.nome as squadra_1_nome,
     p.squadra_2_codice,
+    s2.nome as squadra_2_nome,
     p.squadra_arbitro_codice,
+    sa.nome as squadra_arbitro_nome,
     p.squadra_1_codice as squadra_avversaria_codice,
+    s1.nome as squadra_avversaria_nome,
     p.stato,
     p.note
 from partita p
+join campo c on c.codice = p.campo_codice
+join squadra s1 on s1.codice = p.squadra_1_codice
+join squadra s2 on s2.codice = p.squadra_2_codice
+left join squadra sa on sa.codice = p.squadra_arbitro_codice
 
 -- =====================================================
 -- PARTITE ARBITRATE
@@ -677,20 +721,30 @@ union all
 select
     p.torneo_id,
     p.squadra_arbitro_codice as squadra_codice,
+    sa.nome as squadra_nome,
     'ARBITRAGGIO' as tipo_evento,
     p.id as partita_id,
     p.numero_partita,
     p.fase_torneo_codice,
     p.girone_codice,
     p.campo_codice,
+    c.nome as campo_nome,
     p.orario_inizio,
     p.squadra_1_codice,
+    s1.nome as squadra_1_nome,
     p.squadra_2_codice,
+    s2.nome as squadra_2_nome,
     p.squadra_arbitro_codice,
+    sa.nome as squadra_arbitro_nome,
     null::text as squadra_avversaria_codice,
+    null::text as squadra_avversaria_nome,
     p.stato,
     p.note
 from partita p
+join campo c on c.codice = p.campo_codice
+join squadra s1 on s1.codice = p.squadra_1_codice
+join squadra s2 on s2.codice = p.squadra_2_codice
+join squadra sa on sa.codice = p.squadra_arbitro_codice
 where p.squadra_arbitro_codice is not null
 
 -- =====================================================
@@ -702,17 +756,23 @@ union all
 select
     s.torneo_id,
     s.codice as squadra_codice,
+    s.nome as squadra_nome,
     'PRANZO' as tipo_evento,
     null::integer as partita_id,
     null::integer as numero_partita,
     null::text as fase_torneo_codice,
     null::text as girone_codice,
     null::text as campo_codice,
+    null::text as campo_nome,
     (t.data_torneo::timestamp + s.orario_pranzo) at time zone 'Europe/Rome' as orario_inizio,
     null::text as squadra_1_codice,
+    null::text as squadra_1_nome,
     null::text as squadra_2_codice,
+    null::text as squadra_2_nome,
     null::text as squadra_arbitro_codice,
+    null::text as squadra_arbitro_nome,
     null::text as squadra_avversaria_codice,
+    null::text as squadra_avversaria_nome,
     'programmata' as stato,
     'Pranzo squadra' as note
 from squadra s

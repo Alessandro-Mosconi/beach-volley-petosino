@@ -16,9 +16,13 @@
   --card-bg: rgba(17, 25, 43, 0.9);
   --card-border: rgba(148, 163, 184, 0.35);
   --page-bg: radial-gradient(circle at top, #1f2937 0%, #0b1020 45%, #070b16 100%);
-  --agenda-player-bg: #bfe3c0;
-  --agenda-referee-bg: #f9e7a1;
-  --agenda-card-text: #1a1a1a;
+  --muted-text: #9ca3af;
+  --agenda-player: #38bdf8;
+  --agenda-player-soft: rgba(56, 189, 248, 0.14);
+  --agenda-referee: #f59e0b;
+  --agenda-referee-soft: rgba(245, 158, 11, 0.16);
+  --agenda-lunch: #34d399;
+  --agenda-lunch-soft: rgba(52, 211, 153, 0.15);
 }
 
 :root[data-theme='light'] {
@@ -38,9 +42,13 @@
   --card-bg: rgba(241, 245, 249, 0.95);
   --card-border: rgba(71, 85, 105, 0.3);
   --page-bg: radial-gradient(circle at top, #eff6ff 0%, #f8fafc 55%, #eef2ff 100%);
-  --agenda-player-bg: #d9f8d8;
-  --agenda-referee-bg: #fff3bf;
-  --agenda-card-text: #111827;
+  --muted-text: #64748b;
+  --agenda-player: #0284c7;
+  --agenda-player-soft: rgba(2, 132, 199, 0.1);
+  --agenda-referee: #b45309;
+  --agenda-referee-soft: rgba(180, 83, 9, 0.12);
+  --agenda-lunch: #059669;
+  --agenda-lunch-soft: rgba(5, 150, 105, 0.11);
 }
 
 * {
@@ -146,19 +154,375 @@ ul li {
   border-color: var(--card-border) !important;
 }
 
+.agenda-view {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.agenda-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.agenda-heading h2 {
+  margin-bottom: 0.25rem;
+}
+
+.agenda-heading p {
+  margin: 0;
+  color: var(--muted-text);
+}
+
+.agenda-lunch-summary {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  border: 1px solid var(--agenda-lunch);
+  border-radius: 999px;
+  padding: 0.42rem 0.68rem;
+  background: var(--agenda-lunch-soft);
+}
+
+.agenda-lunch-summary span,
+.agenda-lunch-summary strong {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.agenda-lunch-summary span {
+  color: var(--agenda-lunch);
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.agenda-lunch-summary strong {
+  color: var(--heading-color);
+  font-size: 0.98rem;
+}
+
+.agenda-loading {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.85rem;
+  align-items: center;
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  padding: 1rem;
+  background: var(--card-bg);
+}
+
+.agenda-loading strong,
+.agenda-loading span {
+  display: block;
+}
+
+.agenda-loading span {
+  color: var(--muted-text);
+  margin-top: 0.2rem;
+}
+
+.agenda-spinner {
+  width: 34px;
+  height: 34px;
+  border: 3px solid var(--table-border);
+  border-top-color: var(--agenda-player);
+  border-radius: 999px;
+  animation: agenda-spin 0.75s linear infinite;
+}
+
+.agenda-skeleton-list {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.agenda-skeleton-list span {
+  height: 44px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, var(--card-bg), var(--button-hover-bg), var(--card-bg));
+  background-size: 220% 100%;
+  animation: agenda-shimmer 1.3s ease-in-out infinite;
+}
+
+.agenda-empty {
+  margin: 0;
+  border: 1px dashed var(--card-border);
+  border-radius: 12px;
+  padding: 1rem;
+  color: var(--muted-text);
+}
+
+.agenda-timeline {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.85rem;
+}
+
 .agenda-event-card {
-  color: var(--agenda-card-text);
+  position: relative;
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 0.9rem;
+  align-items: start;
+  overflow: hidden;
+  border: 1px solid var(--card-border);
+  border-left-width: 5px;
+  border-radius: 12px;
+  padding: 0.82rem 0.9rem;
+  background: var(--card-bg) !important;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.1);
 }
 
 .agenda-event-card-player {
-  background: var(--agenda-player-bg) !important;
+  border-left-color: var(--agenda-player) !important;
 }
 
 .agenda-event-card-referee {
-  background: var(--agenda-referee-bg) !important;
+  border-left-color: var(--agenda-referee) !important;
 }
 
-.bracket-tree {
+.agenda-event-card-lunch {
+  border-left-color: var(--agenda-lunch) !important;
+}
+
+.agenda-time-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding-top: 0.1rem;
+}
+
+.agenda-time-block strong {
+  color: var(--heading-color);
+  font-size: 1.42rem;
+  line-height: 1;
+}
+
+.agenda-time-block span {
+  color: var(--muted-text);
+  font-size: 0.76rem;
+  line-height: 1.3;
+  text-transform: capitalize;
+}
+
+.agenda-event-body {
+  min-width: 0;
+}
+
+.agenda-event-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.agenda-event-topline,
+.agenda-event-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.agenda-event-badge,
+.agenda-status,
+.agenda-event-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  border-radius: 999px;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.agenda-icon {
+  width: 0.95em;
+  height: 0.95em;
+  flex: 0 0 auto;
+}
+
+.agenda-event-badge-player {
+  background: var(--agenda-player-soft);
+  color: var(--agenda-player);
+}
+
+.agenda-event-badge-referee {
+  background: var(--agenda-referee-soft);
+  color: var(--agenda-referee);
+}
+
+.agenda-event-badge-lunch {
+  background: var(--agenda-lunch-soft);
+  color: var(--agenda-lunch);
+}
+
+.agenda-status,
+.agenda-event-meta span {
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--muted-text);
+}
+
+.agenda-status {
+  white-space: nowrap;
+  margin-top: 0.02rem;
+}
+
+.agenda-event-body h3 {
+  margin: 0.42rem 0 0;
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.agenda-event-body p {
+  margin: 0.38rem 0 0;
+  color: var(--text-color);
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.agenda-event-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(112px, max-content));
+  margin-top: 0.62rem;
+  gap: 0.42rem;
+}
+
+@keyframes agenda-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes agenda-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+.bracket-view {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.bracket-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.bracket-heading h2 {
+  margin: 0;
+}
+
+.bracket-view-switch {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.bracket-view-switch button {
+  border: 0;
+  border-radius: 9px;
+  padding: 0.45rem 0.7rem;
+  background: transparent;
+  color: var(--muted-text);
+}
+
+.bracket-view-switch button:hover:enabled {
+  background: var(--button-hover-bg);
+  border-color: transparent;
+}
+
+.bracket-view-switch .bracket-view-switch-active {
+  background: var(--input-bg);
+  color: var(--heading-color);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
+}
+
+.bracket-empty {
+  margin: 0;
+  border: 1px dashed var(--card-border);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  color: var(--muted-text);
+}
+
+.bracket-graph-scroll {
+  overflow-x: auto;
+  padding-bottom: 0.2rem;
+}
+
+.bracket-graph {
+  position: relative;
+  width: 940px;
+  height: 714px;
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  background:
+    linear-gradient(rgba(148, 163, 184, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.04) 1px, transparent 1px),
+    rgba(15, 23, 42, 0.18);
+  background-size: 28px 28px;
+}
+
+.bracket-graph-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.bracket-graph-edge {
+  fill: none;
+  stroke: rgba(148, 163, 184, 0.35);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: stroke 0.25s ease, stroke-width 0.25s ease;
+}
+
+.bracket-graph-edge-active {
+  stroke: var(--agenda-lunch);
+  stroke-width: 5;
+  filter: drop-shadow(0 0 6px var(--agenda-lunch-soft));
+}
+
+.bracket-graph-node {
+  position: absolute;
+  width: 224px;
+  height: 144px;
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 0.56rem;
+  background: var(--card-bg);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.16);
+  overflow: hidden;
+}
+
+.bracket-graph-node-complete {
+  border-color: var(--agenda-lunch);
+}
+
+.bracket-card-view {
   display: grid;
   grid-template-columns: repeat(3, minmax(220px, 1fr));
   gap: 1rem;
@@ -177,20 +541,267 @@ ul li {
   background: var(--card-bg);
 }
 
+.bracket-match-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: center;
+  color: var(--muted-text);
+  font-size: 0.78rem;
+}
+
+.bracket-match-heading strong {
+  color: var(--heading-color);
+  white-space: nowrap;
+}
+
+.bracket-graph-meta {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.12rem;
+  margin-top: 0.28rem;
+  color: var(--muted-text);
+  font-size: 0.74rem;
+}
+
+.bracket-graph-meta span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .bracket-team-line {
-  font-weight: 600;
-  margin-top: 0.35rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.55rem;
+  align-items: center;
+  margin-top: 0.4rem;
+  border: 1px solid rgba(148, 163, 184, 0.13);
+  border-radius: 8px;
+  padding: 0.35rem 0.45rem;
+  color: var(--text-color);
+  font-weight: 650;
+}
+
+.bracket-graph-node .bracket-team-line {
+  margin-top: 0.32rem;
+  padding: 0.24rem 0.38rem;
+  min-height: 28px;
+}
+
+.bracket-team-line span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bracket-team-winner {
+  border-color: var(--agenda-lunch);
+  background: var(--agenda-lunch-soft);
+  color: var(--heading-color);
 }
 
 .bracket-meta {
-  font-size: 0.9rem;
-  opacity: 0.9;
-  margin-top: 0.2rem;
+  font-size: 0.86rem;
+  color: var(--muted-text);
+  margin-top: 0.3rem;
 }
 
 .bracket-winner {
-  margin-top: 0.35rem;
-  font-size: 0.92rem;
+  margin-top: 0.45rem;
+  color: var(--agenda-lunch);
+  font-size: 0.9rem;
+  font-weight: 750;
+}
+
+.courts-view {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.courts-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.courts-heading h2 {
+  margin-bottom: 0.25rem;
+}
+
+.courts-heading p {
+  margin: 0;
+  color: var(--muted-text);
+}
+
+.courts-grid {
+  display: grid;
+  grid-template-columns: 82px repeat(var(--court-count), minmax(220px, 1fr));
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.courts-grid-row {
+  display: contents;
+}
+
+.courts-grid-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 0.55rem 0.65rem;
+  background: var(--input-bg);
+  color: var(--heading-color);
+  font-weight: 800;
+  text-align: center;
+}
+
+.courts-grid-time-header {
+  color: var(--muted-text);
+}
+
+.courts-lunch-header {
+  color: var(--agenda-lunch);
+  background: var(--agenda-lunch-soft);
+}
+
+.courts-time-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 0.65rem 0.4rem;
+  background: rgba(148, 163, 184, 0.08);
+  color: var(--heading-color);
+  font-size: 1.05rem;
+  font-weight: 850;
+}
+
+.courts-match-cell {
+  min-width: 0;
+}
+
+.court-match-card,
+.court-match-empty {
+  min-height: 118px;
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 0.7rem;
+  background: var(--card-bg);
+}
+
+.court-lunch-card {
+  min-height: 118px;
+  border: 1px solid var(--agenda-lunch);
+  border-radius: 12px;
+  padding: 0.7rem;
+  background: var(--agenda-lunch-soft);
+}
+
+.court-lunch-empty {
+  color: rgba(148, 163, 184, 0.72);
+}
+
+.court-lunch-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.6rem;
+}
+
+.court-lunch-list span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-radius: 999px;
+  padding: 0.2rem 0.48rem;
+  background: rgba(52, 211, 153, 0.16);
+  color: var(--heading-color);
+  font-size: 0.78rem;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.court-match-empty {
+  display: grid;
+  place-items: center;
+  color: var(--muted-text);
+  border-style: dashed;
+}
+
+.court-match-card-in_corso {
+  border-color: var(--agenda-referee);
+  background: var(--agenda-referee-soft);
+}
+
+.court-match-card-terminata {
+  border-color: var(--agenda-lunch);
+}
+
+.court-match-topline {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.55rem;
+  color: var(--muted-text);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.court-match-topline strong {
+  color: var(--table-header);
+  white-space: nowrap;
+}
+
+.court-match-teams {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 0.42rem;
+  align-items: center;
+  margin-top: 0.55rem;
+  color: var(--heading-color);
+  font-weight: 800;
+}
+
+.court-match-teams span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.court-match-teams span:last-child {
+  text-align: right;
+}
+
+.court-match-teams small {
+  color: var(--muted-text);
+  font-weight: 700;
+}
+
+.court-match-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.65rem;
+}
+
+.court-match-details span {
+  border-radius: 999px;
+  padding: 0.18rem 0.45rem;
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--muted-text);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.courts-mobile-list {
+  display: none;
 }
 
 @media (max-width: 640px) {
@@ -212,10 +823,91 @@ ul li {
     flex-direction: column;
     align-items: flex-start;
   }
+
+  .agenda-heading {
+    flex-direction: column;
+  }
+
+  .agenda-lunch-summary {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .agenda-event-card {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .agenda-time-block {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--table-border);
+    padding-bottom: 0.6rem;
+  }
+
+  .agenda-event-header {
+    align-items: flex-start;
+  }
+
+  .bracket-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .bracket-view-switch {
+    width: 100%;
+  }
+
+  .bracket-view-switch button {
+    flex: 1;
+  }
 }
 
 @media (max-width: 980px) {
-  .bracket-tree {
+  .bracket-card-view {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .courts-grid {
+    display: none;
+  }
+
+  .courts-mobile-list {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .courts-mobile-slot {
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 0.85rem;
+    background: rgba(148, 163, 184, 0.06);
+  }
+
+  .courts-mobile-slot h3 {
+    margin-bottom: 0.65rem;
+  }
+
+  .courts-mobile-cards {
+    display: grid;
+    gap: 0.7rem;
+  }
+
+  .courts-mobile-court {
+    display: grid;
+    gap: 0.45rem;
+  }
+
+  .courts-mobile-court > strong {
+    color: var(--table-header);
+  }
+
+  .court-match-card,
+  .court-match-empty,
+  .court-lunch-card {
+    min-height: auto;
   }
 }

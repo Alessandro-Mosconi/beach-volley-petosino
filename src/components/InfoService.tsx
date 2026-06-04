@@ -30,7 +30,7 @@ export default function InfoService() {
     const supabaseResult = await Promise.race([
       supabase
         .from('squadra')
-        .select('id', { count: 'exact', head: true })
+        .select('codice', { count: 'exact', head: true })
         .then(({ error }) => ({
           ok: !error,
           message: error?.message ?? ''

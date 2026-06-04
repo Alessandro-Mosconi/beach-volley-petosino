@@ -15,6 +15,8 @@ interface TeamRow {
   partite_perse: number;
   set_vinti: number;
   set_persi: number;
+  punti_fatti: number;
+  punti_subiti: number;
   punti_classifica: number;
   girone_codice: string;
   girone_nome: string;
@@ -37,7 +39,7 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
       const { data: classificaRows, error } = await supabase
         .from('v_classifica_gironi')
         .select(
-          'posizione, squadra_codice, squadra_nome, partite_giocate, partite_vinte, partite_perse, set_vinti, set_persi, punti_classifica, girone_codice, girone_nome'
+          'posizione, squadra_codice, squadra_nome, partite_giocate, partite_vinte, partite_perse, set_vinti, set_persi, punti_fatti, punti_subiti, differenza_punti, punti_classifica, girone_codice, girone_nome'
         )
         .eq('torneo_id', tournamentId)
         .order('girone_codice', { ascending: true })
@@ -78,6 +80,8 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
           partite_perse: r.partite_perse,
           set_vinti: r.set_vinti,
           set_persi: r.set_persi,
+          punti_fatti: r.punti_fatti,
+          punti_subiti: r.punti_subiti,
           punti_classifica: r.punti_classifica,
           girone_codice: r.girone_codice,
           girone_nome: r.girone_nome ?? ''
@@ -100,6 +104,8 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
           partite_perse: 0,
           set_vinti: 0,
           set_persi: 0,
+          punti_fatti: 0,
+          punti_subiti: 0,
           punti_classifica: 0,
           girone_codice: p.girone_codice,
           girone_nome: gironeMap.get(p.girone_codice) ?? ''
@@ -128,10 +134,9 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
         }
 
         if (a.punti_classifica !== b.punti_classifica) return b.punti_classifica - a.punti_classifica;
-        if (a.partite_vinte !== b.partite_vinte) return b.partite_vinte - a.partite_vinte;
-        const setDiffA = a.set_vinti - a.set_persi;
-        const setDiffB = b.set_vinti - b.set_persi;
-        if (setDiffA !== setDiffB) return setDiffB - setDiffA;
+        const pointsDiffA = a.punti_fatti - a.punti_subiti;
+        const pointsDiffB = b.punti_fatti - b.punti_subiti;
+        if (pointsDiffA !== pointsDiffB) return pointsDiffB - pointsDiffA;
 
         return a.squadra_nome.localeCompare(b.squadra_nome, 'it');
       });
@@ -194,11 +199,6 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
         Object.keys(groups).sort((a, b) => a.localeCompare(b, 'it')).map((gironeCodice) => (
           <section key={gironeCodice} className="standings-group">
             <h3>Girone {groups[gironeCodice][0]?.girone_nome || gironeCodice}</h3>
-            {groups[gironeCodice].every((row) => row.partite_giocate === 0) && (
-              <p className="standings-note">
-                Nessuna partita ancora giocata. Elenco partecipanti visibile.
-              </p>
-            )}
             <div className="standings-table-scroll">
               <table className="standings-table">
                 <colgroup>
@@ -208,6 +208,8 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
                   <col className="standings-col-small" />
                   <col className="standings-col-small" />
                   <col className="standings-col-sets" />
+                  <col className="standings-col-score-points" />
+                  <col className="standings-col-score-points" />
                   <col className="standings-col-points" />
                 </colgroup>
                 <thead>
@@ -218,6 +220,8 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
                     <th>Vinte</th>
                     <th>Perse</th>
                     <th>Set V/P</th>
+                    <th>PF</th>
+                    <th>PS</th>
                     <th>Punti</th>
                   </tr>
                 </thead>
@@ -244,6 +248,8 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
                         <td>
                           {row.set_vinti} / {row.set_persi}
                         </td>
+                        <td>{row.punti_fatti}</td>
+                        <td>{row.punti_subiti}</td>
                         <td>{row.punti_classifica}</td>
                       </tr>
                     );

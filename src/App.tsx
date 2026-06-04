@@ -167,6 +167,27 @@ function ThemeIcon({ type }: { type: Theme }) {
   );
 }
 
+function ThemeToggle({ theme, onToggle }: { theme: Theme; onToggle: () => void }) {
+  return (
+    <button
+      className="theme-toggle"
+      type="button"
+      aria-label={theme === 'dark' ? 'Passa al tema chiaro' : 'Passa al tema scuro'}
+      aria-pressed={theme === 'dark'}
+      title={theme === 'dark' ? 'Tema scuro' : 'Tema chiaro'}
+      onClick={onToggle}
+    >
+      <span className="theme-toggle-icon theme-toggle-sun">
+        <ThemeIcon type="light" />
+      </span>
+      <span className="theme-toggle-icon theme-toggle-moon">
+        <ThemeIcon type="dark" />
+      </span>
+      <span className="theme-toggle-thumb" />
+    </button>
+  );
+}
+
 function viewFromPath(pathname: string): View {
   switch (pathname) {
     case '/':
@@ -236,7 +257,7 @@ export default function App() {
   });
   const [theme, setTheme] = useState<Theme>(() => {
     const storedTheme = window.localStorage.getItem('theme');
-    return storedTheme === 'light' ? 'light' : 'dark';
+    return storedTheme === 'dark' ? 'dark' : 'light';
   });
 
   useEffect(() => {
@@ -454,27 +475,30 @@ export default function App() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <h1>Torneo Beach Volley</h1>
+        <div className="brand-mark">
+          <span>Torneo Beach Volley</span>
+          <h1>{activeTournament.nome}</h1>
+        </div>
+        <nav className="desktop-tab-nav" aria-label="Navigazione principale">
+          {visibleNavItems.map((item) => (
+            <button
+              key={item.view}
+              type="button"
+              className={view === item.view ? 'active' : ''}
+              aria-current={view === item.view ? 'page' : undefined}
+              onClick={() => goToView(item.view)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
         <div className="header-actions">
           <div className="desktop-auth">
             <AuthPanel session={session} canEdit={canEditResults} onSessionChange={setSession} />
           </div>
-          <button
-            className="theme-toggle"
-            type="button"
-            aria-label={theme === 'dark' ? 'Passa al tema chiaro' : 'Passa al tema scuro'}
-            aria-pressed={theme === 'dark'}
-            title={theme === 'dark' ? 'Tema scuro' : 'Tema chiaro'}
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          >
-            <span className="theme-toggle-icon theme-toggle-sun">
-              <ThemeIcon type="light" />
-            </span>
-            <span className="theme-toggle-icon theme-toggle-moon">
-              <ThemeIcon type="dark" />
-            </span>
-            <span className="theme-toggle-thumb" />
-          </button>
+          <div className="desktop-theme-toggle">
+            <ThemeToggle theme={theme} onToggle={() => setTheme(theme === 'dark' ? 'light' : 'dark')} />
+          </div>
           <nav className="mobile-nav-menu" aria-label="Navigazione principale mobile">
             <button
               className="nav-menu-trigger"
@@ -503,6 +527,9 @@ export default function App() {
                     {item.label}
                   </button>
                 ))}
+                <div className="mobile-theme-toggle">
+                  <ThemeToggle theme={theme} onToggle={() => setTheme(theme === 'dark' ? 'light' : 'dark')} />
+                </div>
                 <div className="mobile-nav-auth">
                   <AuthPanel session={session} canEdit={canEditResults} onSessionChange={setSession} />
                 </div>
@@ -511,20 +538,6 @@ export default function App() {
           </nav>
         </div>
       </header>
-      {/* Navigation */}
-      <nav className="desktop-tab-nav" aria-label="Navigazione principale">
-        {visibleNavItems.map((item) => (
-          <button
-            key={item.view}
-            type="button"
-            className={view === item.view ? 'active' : ''}
-            aria-current={view === item.view ? 'page' : undefined}
-            onClick={() => goToView(item.view)}
-          >
-            {item.label}
-          </button>
-        ))}
-      </nav>
       {/* Render chosen view */}
       <div className="section-panel">
         {teams.length === 0 && view !== 'info_service' && (

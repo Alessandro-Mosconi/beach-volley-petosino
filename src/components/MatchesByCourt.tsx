@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../utils/supabase';
 
 interface Court {
@@ -901,12 +902,47 @@ export default function MatchesByCourt({ tournamentId, canEdit }: MatchesByCourt
     );
   }
 
+  const editorPortal = (
+    <>
+      {editingMatch && (
+        <ResultEditor
+          match={editingMatch}
+          sets={setsByMatch[editingMatch.partita_id] ?? []}
+          saving={saving}
+          error={saveError}
+          onCancel={() => {
+            setEditingMatch(null);
+            setSaveError(null);
+          }}
+          onSave={saveResult}
+        />
+      )}
+      {editingMatchDetails !== undefined && (
+        <MatchEditor
+          match={editingMatchDetails}
+          tournamentId={tournamentId}
+          courts={courts}
+          teams={teams}
+          phases={phases}
+          groups={groups}
+          saving={saving}
+          error={saveError}
+          onCancel={() => {
+            setEditingMatchDetails(undefined);
+            setSaveError(null);
+          }}
+          onSave={saveMatchDetails}
+          onDelete={deleteMatch}
+        />
+      )}
+    </>
+  );
+
   return (
     <div className="courts-view">
       <div className="courts-heading">
         <div>
           <h2>Partite per campo</h2>
-          <p>{canEdit ? 'Tocca Risultato su una partita per aggiornare set e stato.' : 'Partite affiancate per orario, con squadre e arbitraggio.'}</p>
         </div>
         {canEdit && (
           <button
@@ -999,37 +1035,7 @@ export default function MatchesByCourt({ tournamentId, canEdit }: MatchesByCourt
           </div>
         </>
       )}
-      {editingMatch && (
-        <ResultEditor
-          match={editingMatch}
-          sets={setsByMatch[editingMatch.partita_id] ?? []}
-          saving={saving}
-          error={saveError}
-          onCancel={() => {
-            setEditingMatch(null);
-            setSaveError(null);
-          }}
-          onSave={saveResult}
-        />
-      )}
-      {editingMatchDetails !== undefined && (
-        <MatchEditor
-          match={editingMatchDetails}
-          tournamentId={tournamentId}
-          courts={courts}
-          teams={teams}
-          phases={phases}
-          groups={groups}
-          saving={saving}
-          error={saveError}
-          onCancel={() => {
-            setEditingMatchDetails(undefined);
-            setSaveError(null);
-          }}
-          onSave={saveMatchDetails}
-          onDelete={deleteMatch}
-        />
-      )}
+      {(editingMatch || editingMatchDetails !== undefined) && createPortal(editorPortal, document.body)}
     </div>
   );
 }

@@ -23,6 +23,8 @@ interface StatRow {
   partite_perse: number;
   set_vinti: number;
   set_persi: number;
+  punti_fatti: number;
+  punti_subiti: number;
   punti_classifica: number;
 }
 
@@ -44,7 +46,7 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
       const { data, error } = await supabase
         .from('v_classifica_ordinata')
         .select(
-          'fase_nome, girone_nome, posizione, partite_giocate, partite_vinte, partite_perse, set_vinti, set_persi, punti_classifica, fase_torneo_codice'
+          'fase_nome, girone_nome, posizione, partite_giocate, partite_vinte, partite_perse, set_vinti, set_persi, punti_fatti, punti_subiti, punti_classifica, fase_torneo_codice'
         )
         .eq('torneo_id', tournamentId)
         .eq('squadra_codice', teamId)
@@ -63,6 +65,8 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
         partite_perse: r.partite_perse,
         set_vinti: r.set_vinti,
         set_persi: r.set_persi,
+        punti_fatti: r.punti_fatti,
+        punti_subiti: r.punti_subiti,
         punti_classifica: r.punti_classifica
       }));
       setStats(formatted);
@@ -119,60 +123,128 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
       ) : stats.length === 0 ? (
         <p>Nessuna statistica disponibile per questa squadra.</p>
       ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table
-            style={{
-              width: '100%',
-              borderCollapse: 'collapse',
-              marginTop: '0.5rem',
-              minWidth: '640px'
-            }}
-          >
-            <thead>
-              <tr>
-                <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Fase</th>
-                <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Girone</th>
-                <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Pos</th>
-                <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>PG</th>
-                <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>V</th>
-                <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>P</th>
-                <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Set V/P</th>
-                <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Punti</th>
-              </tr>
-            </thead>
-            <tbody>
-              {stats.map((row, idx) => {
-                const qualificationTier = getQualificationTier(row.posizione);
-                return (
-                  <tr
-                    key={idx}
-                    className={qualificationTier ? `standings-row-${qualificationTier}` : undefined}
-                  >
-                    <td style={{ padding: '0.25rem' }}>{row.fase_nome}</td>
-                    <td style={{ padding: '0.25rem' }}>{row.girone_nome ?? '-'}</td>
-                    <td style={{ padding: '0.25rem' }}>
-                      <span className="team-stats-position">
-                        {row.posizione}
-                        {qualificationTier && (
-                          <span className={`standings-qualification standings-qualification-${qualificationTier}`}>
-                            {qualificationTier === 'gold' ? 'Gold' : 'Silver'}
-                          </span>
-                        )}
-                      </span>
-                    </td>
-                    <td style={{ padding: '0.25rem' }}>{row.partite_giocate}</td>
-                    <td style={{ padding: '0.25rem' }}>{row.partite_vinte}</td>
-                    <td style={{ padding: '0.25rem' }}>{row.partite_perse}</td>
-                    <td style={{ padding: '0.25rem' }}>
-                      {row.set_vinti} / {row.set_persi}
-                    </td>
-                    <td style={{ padding: '0.25rem' }}>{row.punti_classifica}</td>
+        <>
+          <section className="standings-group team-stats-table-group">
+            <div className="standings-table-scroll">
+              <table className="standings-table team-stats-table">
+                <colgroup>
+                  <col className="team-stats-col-phase" />
+                  <col className="team-stats-col-group" />
+                  <col className="standings-col-pos" />
+                  <col className="standings-col-small" />
+                  <col className="standings-col-small" />
+                  <col className="standings-col-small" />
+                  <col className="standings-col-sets" />
+                  <col className="standings-col-score-points" />
+                  <col className="standings-col-score-points" />
+                  <col className="standings-col-points" />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>Fase</th>
+                    <th>Girone</th>
+                    <th>Pos</th>
+                    <th>PG</th>
+                    <th>V</th>
+                    <th>P</th>
+                    <th>Set V/P</th>
+                    <th>PF</th>
+                    <th>PS</th>
+                    <th>Punti</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody>
+                  {stats.map((row, idx) => {
+                    const qualificationTier = getQualificationTier(row.posizione);
+                    return (
+                      <tr key={idx} className={qualificationTier ? `standings-row-${qualificationTier}` : undefined}>
+                        <td>{row.fase_nome}</td>
+                        <td>{row.girone_nome ?? '-'}</td>
+                        <td>
+                          <span className="team-stats-position">
+                            {row.posizione}
+                            {qualificationTier && (
+                              <span className={`standings-qualification standings-qualification-${qualificationTier}`}>
+                                {qualificationTier === 'gold' ? 'Gold' : 'Silver'}
+                              </span>
+                            )}
+                          </span>
+                        </td>
+                        <td>{row.partite_giocate}</td>
+                        <td>{row.partite_vinte}</td>
+                        <td>{row.partite_perse}</td>
+                        <td>
+                          {row.set_vinti} / {row.set_persi}
+                        </td>
+                        <td>{row.punti_fatti}</td>
+                        <td>{row.punti_subiti}</td>
+                        <td>{row.punti_classifica}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <div className="team-stats-mobile-list">
+            {stats.map((row, idx) => {
+              const qualificationTier = getQualificationTier(row.posizione);
+              return (
+                <article
+                  key={`${row.fase_nome}-${row.girone_nome ?? 'fase'}-${idx}`}
+                  className={qualificationTier ? `team-stats-card standings-row-${qualificationTier}` : 'team-stats-card'}
+                >
+                  <div className="team-stats-card-heading">
+                    <div>
+                      <span>{row.fase_nome}</span>
+                      {row.girone_nome && <strong>{row.girone_nome}</strong>}
+                    </div>
+                    <div className="team-stats-card-position">
+                      <span>{row.posizione}</span>
+                      {qualificationTier && (
+                        <small className={`standings-qualification standings-qualification-${qualificationTier}`}>
+                          {qualificationTier === 'gold' ? 'Gold' : 'Silver'}
+                        </small>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="team-stats-card-grid">
+                    <div>
+                      <span>PG</span>
+                      <strong>{row.partite_giocate}</strong>
+                    </div>
+                    <div>
+                      <span>V</span>
+                      <strong>{row.partite_vinte}</strong>
+                    </div>
+                    <div>
+                      <span>P</span>
+                      <strong>{row.partite_perse}</strong>
+                    </div>
+                    <div>
+                      <span>Set</span>
+                      <strong>{row.set_vinti} / {row.set_persi}</strong>
+                    </div>
+                    <div>
+                      <span>PF</span>
+                      <strong>{row.punti_fatti}</strong>
+                    </div>
+                    <div>
+                      <span>PS</span>
+                      <strong>{row.punti_subiti}</strong>
+                    </div>
+                    <div className="team-stats-card-points">
+                      <span>Punti</span>
+                      <strong>{row.punti_classifica}</strong>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </>
       )}
     </div>
   );

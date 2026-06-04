@@ -9,19 +9,32 @@ interface FinalRankingProps {
 interface FinalRankingRow {
   posizione: number;
   squadra_nome: string;
-  descrizione: string;
+}
+
+function positionLabel(position: number) {
+  switch (position) {
+    case 1:
+      return 'Primo posto';
+    case 2:
+      return 'Secondo posto';
+    case 3:
+      return 'Terzo posto';
+    default:
+      return 'Quarto posto';
+  }
 }
 
 export default function FinalRanking({ faseName, tournamentId }: FinalRankingProps) {
   const [ranking, setRanking] = useState<FinalRankingRow[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const phaseClass = faseName.toLowerCase();
 
   useEffect(() => {
     async function fetchRanking() {
       setLoading(true);
       const { data, error } = await supabase
         .from('v_classifica_finale')
-        .select('posizione, squadra_nome, descrizione')
+        .select('posizione, squadra_nome')
         .eq('torneo_id', tournamentId)
         .eq('fase_torneo_codice', faseName)
         .order('posizione', { ascending: true });
@@ -44,22 +57,30 @@ export default function FinalRanking({ faseName, tournamentId }: FinalRankingPro
   }, [faseName, tournamentId]);
 
   return (
-    <div className="final-ranking-view">
-      <h2>Classifica {faseName}</h2>
+    <div className={`final-ranking-view final-ranking-view-${phaseClass}`}>
+      <div className="final-ranking-hero">
+        <h2>Classifica finale {faseName}</h2>
+      </div>
       {loading ? (
-        <p>Caricamento classifica...</p>
+        <p className="final-ranking-status">Caricamento classifica...</p>
       ) : !ranking ? (
-        <p className="agenda-empty">Classifica disponibile quando finale e finalina sono terminate.</p>
+        <p className="final-ranking-status">Classifica disponibile quando finale e finalina hanno un vincitore.</p>
       ) : (
-        <ol className="final-ranking-list">
-          {ranking.map((row) => (
-            <li key={row.posizione} className={`final-ranking-row final-ranking-row-${row.posizione}`}>
-              <span className="final-ranking-position">{row.posizione}</span>
-              <strong>{row.squadra_nome}</strong>
-              <span>{row.descrizione}</span>
-            </li>
-          ))}
-        </ol>
+        <>
+          <ol className="final-ranking-list">
+            {ranking.map((row) => (
+              <li key={row.posizione} className={`final-ranking-row final-ranking-row-${row.posizione}`}>
+                <span className="final-ranking-position">
+                  <span>{row.posizione}</span>
+                </span>
+                <div className="final-ranking-team">
+                  <strong>{row.squadra_nome}</strong>
+                  <small>{positionLabel(row.posizione)}</small>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </>
       )}
     </div>
   );

@@ -127,12 +127,12 @@ export default function App() {
         .from('torneo')
         .select('id, nome')
         .eq('visibile', true)
-        .single();
+        .maybeSingle();
 
       if (tournamentError || !tournament) {
         setActiveTournament(null);
         setTeams([]);
-        setTeamsLoadError(tournamentError?.message ?? 'Nessun torneo visibile configurato');
+        setTeamsLoadError(tournamentError ? 'Errore nel caricamento del torneo attivo' : null);
         setLoading(false);
         return;
       }
@@ -190,7 +190,7 @@ export default function App() {
     return (
       <div className="app-shell">
         <div className="section-panel">
-          <p>Nessun torneo visibile configurato.{teamsLoadError ? ` Errore Supabase: ${teamsLoadError}` : ''}</p>
+          <p>{teamsLoadError ?? 'Nessun torneo attivo al momento'}</p>
         </div>
       </div>
     );

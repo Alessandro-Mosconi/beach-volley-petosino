@@ -7,7 +7,6 @@ interface BracketProps {
 
 interface MatchData {
   id: number;
-  numero_partita: number;
   squadra_1_codice: string | null;
   squadra_2_codice: string | null;
   squadra_1_nome: string;
@@ -54,7 +53,6 @@ function createEmptySlot(slotIndex: number): BracketSlot {
   return {
     id: -100 - slotIndex,
     slotIndex,
-    numero_partita: slotIndex + 1,
     squadra_1_codice: null,
     squadra_2_codice: null,
     squadra_1_nome: '',
@@ -116,10 +114,12 @@ export default function Bracket({ faseName }: BracketProps) {
       const { data: partite, error: partitaErr } = await supabase
         .from('v_partita_risultato')
         .select(
-          'partita_id, numero_partita, squadra_1_codice, squadra_1_nome, squadra_2_codice, squadra_2_nome, squadra_vincitrice_codice, orario_inizio, campo_nome, set_vinti_squadra_1, set_vinti_squadra_2'
+          'partita_id, squadra_1_codice, squadra_1_nome, squadra_2_codice, squadra_2_nome, squadra_vincitrice_codice, orario_inizio, campo_nome, set_vinti_squadra_1, set_vinti_squadra_2'
         )
         .eq('fase_torneo_codice', faseName)
-        .order('numero_partita', { ascending: true });
+        .order('orario_inizio', { ascending: true })
+        .order('campo_nome', { ascending: true })
+        .order('partita_id', { ascending: true });
 
       if (partitaErr || !partite) {
         setMatches([]);
@@ -129,7 +129,6 @@ export default function Bracket({ faseName }: BracketProps) {
 
       const matchData: MatchData[] = partite.map((partita) => ({
         id: partita.partita_id,
-        numero_partita: partita.numero_partita ?? 0,
         squadra_1_codice: partita.squadra_1_codice,
         squadra_2_codice: partita.squadra_2_codice,
         squadra_1_nome: partita.squadra_1_nome ?? '',
@@ -141,7 +140,7 @@ export default function Bracket({ faseName }: BracketProps) {
         campo_nome: partita.campo_nome ?? ''
       }));
 
-      setMatches(matchData.filter((m) => m.numero_partita > 0));
+      setMatches(matchData.filter((m) => m.id > 0));
       setLoading(false);
     }
     fetchMatches();
@@ -172,7 +171,6 @@ export default function Bracket({ faseName }: BracketProps) {
       <>
         <div className="bracket-match-heading">
           <span>{GRAPH_NODES.find((node) => node.slotIndex === match.slotIndex)?.round}</span>
-          <strong>Partita {match.numero_partita}</strong>
         </div>
         {compact ? (
           <div className="bracket-graph-meta">

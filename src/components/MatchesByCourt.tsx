@@ -9,7 +9,6 @@ interface Court {
 
 interface CourtMatch {
   partita_id: number;
-  numero_partita: number;
   fase_torneo_codice: string;
   girone_codice: string | null;
   campo_codice: string;
@@ -56,7 +55,7 @@ function MatchCell({ match }: { match: CourtMatch | null }) {
   return (
     <article className={`court-match-card court-match-card-${match.stato}`}>
       <div className="court-match-topline">
-        <span>Partita {match.numero_partita}</span>
+        <span>{match.campo_nome}</span>
         <strong>{formatRound(match)}</strong>
       </div>
       <div className="court-match-teams">
@@ -108,7 +107,7 @@ export default function MatchesByCourt() {
         supabase
           .from('v_partita_risultato')
           .select(
-            'partita_id, numero_partita, fase_torneo_codice, girone_codice, campo_codice, campo_nome, orario_inizio, squadra_1_nome, squadra_2_nome, squadra_arbitro_nome, arbitro_organizzazione, risultato_set, stato'
+            'partita_id, fase_torneo_codice, girone_codice, campo_codice, campo_nome, orario_inizio, squadra_1_nome, squadra_2_nome, squadra_arbitro_nome, arbitro_organizzazione, risultato_set, stato'
           )
           .order('orario_inizio', { ascending: true })
           .order('campo_codice', { ascending: true }),

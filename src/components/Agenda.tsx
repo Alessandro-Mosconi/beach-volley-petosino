@@ -13,11 +13,10 @@ interface MatchEvent {
   campo: string;
   opponent: string;
   role: 'player' | 'referee' | 'lunch';
-  matchNumber: number | null;
   status: string;
 }
 
-type IconName = 'ball' | 'clipboard' | 'utensils' | 'mapPin' | 'hash' | 'pulse';
+type IconName = 'ball' | 'clipboard' | 'utensils' | 'mapPin' | 'pulse';
 
 function AgendaIcon({ name }: { name: IconName }) {
   const commonProps = {
@@ -76,17 +75,6 @@ function AgendaIcon({ name }: { name: IconName }) {
     );
   }
 
-  if (name === 'hash') {
-    return (
-      <svg {...commonProps}>
-        <path d="M5 9h14" />
-        <path d="M4 15h14" />
-        <path d="M10 3 8 21" />
-        <path d="M16 3l-2 18" />
-      </svg>
-    );
-  }
-
   return (
     <svg {...commonProps}>
       <path d="M4 12h4l2-5 4 10 2-5h4" />
@@ -134,7 +122,7 @@ export default function Agenda({ teamId, teams }: AgendaProps) {
       const { data, error } = await supabase
         .from('v_agenda_squadra')
         .select(
-          'tipo_evento, partita_id, numero_partita, squadra_codice, campo_nome, orario_inizio, squadra_1_nome, squadra_2_nome, squadra_avversaria_nome, stato'
+          'tipo_evento, partita_id, squadra_codice, campo_nome, orario_inizio, squadra_1_nome, squadra_2_nome, squadra_avversaria_nome, stato'
         )
         .eq('squadra_codice', teamId)
         .order('orario_inizio', { ascending: true });
@@ -154,7 +142,6 @@ export default function Agenda({ teamId, teams }: AgendaProps) {
             campo: '',
             opponent: 'Pausa programmata',
             role: 'lunch',
-            matchNumber: null,
             status: eventRow.stato ?? 'programmata'
           };
         }
@@ -170,7 +157,6 @@ export default function Agenda({ teamId, teams }: AgendaProps) {
           campo: eventRow.campo_nome ?? '',
           opponent: opponentName,
           role: isReferee ? 'referee' : 'player',
-          matchNumber: eventRow.numero_partita ?? null,
           status: eventRow.stato ?? ''
         };
       });
@@ -292,7 +278,6 @@ export default function Agenda({ teamId, teams }: AgendaProps) {
                 </div>
                 <p>{e.role === 'lunch' ? e.opponent : `${e.role === 'referee' ? 'Arbitro per' : 'Contro'}: ${e.opponent}`}</p>
                 <div className="agenda-event-meta">
-                  {e.matchNumber && <span><AgendaIcon name="hash" />Partita {e.matchNumber}</span>}
                   {e.campo && <span><AgendaIcon name="mapPin" />{e.campo}</span>}
                   <span><AgendaIcon name={EVENT_META[e.role].icon} />{EVENT_META[e.role].eyebrow}</span>
                 </div>

@@ -186,7 +186,6 @@ create table partita (
     fase_torneo_codice text not null references fase_torneo(codice),
     girone_codice text references girone(codice) on delete set null,
     campo_codice text not null references campo(codice),
-    numero_partita integer not null,
     turno text not null,
     orario_inizio timestamp with time zone not null,
     squadra_1_codice text not null references squadra(codice),
@@ -194,8 +193,7 @@ create table partita (
     squadra_arbitro_codice text references squadra(codice),
     squadra_vincitrice_codice text references squadra(codice),
     squadra_perdente_codice text references squadra(codice),
-    stato text not null default 'programmata'
-        check (stato in ('programmata', 'in_corso', 'terminata', 'annullata')),
+    stato text default 'programmata',
     note text,
 
     constraint chk_partita_squadre_diverse
@@ -229,9 +227,7 @@ create table partita (
             squadra_vincitrice_codice is null
             or squadra_perdente_codice is null
             or squadra_vincitrice_codice <> squadra_perdente_codice
-        ),
-
-    unique (torneo_id, numero_partita)
+    )
 );
 
 -- Trigger validazione vincitore/perdente partita
@@ -432,7 +428,6 @@ select
     p.girone_codice,
     p.campo_codice,
     c.nome as campo_nome,
-    p.numero_partita,
     p.turno,
     p.orario_inizio,
     p.squadra_1_codice,
@@ -471,7 +466,7 @@ left join squadra sp on sp.codice = p.squadra_perdente_codice
 left join partita_set ps on ps.partita_id = p.id
 group by
     p.id, p.torneo_id, p.fase_torneo_codice, p.girone_codice, p.campo_codice,
-    c.nome, p.numero_partita, p.turno, p.orario_inizio,
+    c.nome, p.turno, p.orario_inizio,
     p.squadra_1_codice, s1.nome, p.squadra_2_codice, s2.nome,
     p.squadra_arbitro_codice, sa.nome,
     p.squadra_vincitrice_codice, sv.nome,
@@ -491,7 +486,6 @@ select
     r.girone_codice,
     r.campo_codice,
     r.campo_nome,
-    r.numero_partita,
     r.turno,
     r.orario_inizio,
     r.squadra_1_codice as squadra_codice,
@@ -521,7 +515,6 @@ select
     r.girone_codice,
     r.campo_codice,
     r.campo_nome,
-    r.numero_partita,
     r.turno,
     r.orario_inizio,
     r.squadra_2_codice as squadra_codice,
@@ -660,7 +653,6 @@ select
     s1.nome as squadra_nome,
     'PARTITA' as tipo_evento,
     p.id as partita_id,
-    p.numero_partita,
     p.fase_torneo_codice,
     p.girone_codice,
     p.campo_codice,
@@ -690,7 +682,6 @@ select
     s2.nome as squadra_nome,
     'PARTITA' as tipo_evento,
     p.id as partita_id,
-    p.numero_partita,
     p.fase_torneo_codice,
     p.girone_codice,
     p.campo_codice,
@@ -724,7 +715,6 @@ select
     sa.nome as squadra_nome,
     'ARBITRAGGIO' as tipo_evento,
     p.id as partita_id,
-    p.numero_partita,
     p.fase_torneo_codice,
     p.girone_codice,
     p.campo_codice,
@@ -759,7 +749,6 @@ select
     s.nome as squadra_nome,
     'PRANZO' as tipo_evento,
     null::integer as partita_id,
-    null::integer as numero_partita,
     null::text as fase_torneo_codice,
     null::text as girone_codice,
     null::text as campo_codice,

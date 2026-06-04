@@ -282,6 +282,14 @@ export default function App() {
   };
 
   useEffect(() => {
+    if (!session && view === 'info_service') {
+      goToView('agenda');
+    }
+  }, [session, view]);
+
+  const visibleNavItems = NAV_ITEMS.filter((item) => item.view !== 'info_service' || Boolean(session));
+
+  useEffect(() => {
     async function fetchTournamentAndTeams() {
       const { data: tournament, error: tournamentError } = await supabase
         .from('torneo')
@@ -397,7 +405,7 @@ export default function App() {
             </button>
             {navOpen && (
               <div id="main-navigation-menu" className="nav-menu-popover">
-                {NAV_ITEMS.map((item) => (
+                {visibleNavItems.map((item) => (
                   <button
                     key={item.view}
                     type="button"
@@ -418,7 +426,7 @@ export default function App() {
       </header>
       {/* Navigation */}
       <nav className="desktop-tab-nav" aria-label="Navigazione principale">
-        {NAV_ITEMS.map((item) => (
+        {visibleNavItems.map((item) => (
           <button
             key={item.view}
             type="button"

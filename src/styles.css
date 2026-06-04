@@ -748,6 +748,78 @@ ul li {
   font-weight: 750;
 }
 
+.standings-view {
+  display: grid;
+  gap: 1.1rem;
+}
+
+.standings-view h2 {
+  margin-bottom: 0;
+}
+
+.standings-group {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.standings-group h3 {
+  margin-bottom: 0;
+}
+
+.standings-note {
+  margin: 0;
+  color: var(--muted-text);
+}
+
+.standings-table-scroll {
+  overflow-x: auto;
+}
+
+.standings-table {
+  width: 100%;
+  min-width: 720px;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.standings-table th,
+.standings-table td {
+  padding: 0.45rem 0.55rem;
+  text-align: center;
+}
+
+.standings-table th:nth-child(2),
+.standings-table td:nth-child(2) {
+  text-align: left;
+}
+
+.standings-table td:nth-child(2) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.standings-col-pos {
+  width: 58px;
+}
+
+.standings-col-team {
+  width: 42%;
+}
+
+.standings-col-small {
+  width: 82px;
+}
+
+.standings-col-sets {
+  width: 100px;
+}
+
+.standings-col-points {
+  width: 86px;
+}
+
 .courts-view {
   display: flex;
   flex-direction: column;

@@ -111,13 +111,21 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
       });
 
       const formatted: TeamRow[] = mergedRows.sort((a, b) => {
-        const groupCompare = a.girone_nome.localeCompare(b.girone_nome, 'it');
+        const groupCompare = a.girone_codice.localeCompare(b.girone_codice, 'it');
         if (groupCompare !== 0) return groupCompare;
+
         if (a.posizione === null && b.posizione !== null) return 1;
         if (a.posizione !== null && b.posizione === null) return -1;
         if (a.posizione !== null && b.posizione !== null && a.posizione !== b.posizione) {
           return a.posizione - b.posizione;
         }
+
+        if (a.punti_classifica !== b.punti_classifica) return b.punti_classifica - a.punti_classifica;
+        if (a.partite_vinte !== b.partite_vinte) return b.partite_vinte - a.partite_vinte;
+        const setDiffA = a.set_vinti - a.set_persi;
+        const setDiffB = b.set_vinti - b.set_persi;
+        if (setDiffA !== setDiffB) return setDiffB - setDiffA;
+
         return a.squadra_nome.localeCompare(b.squadra_nome, 'it');
       });
 
@@ -163,65 +171,67 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
   // Group rows by girone
   const groups: { [key: string]: TeamRow[] } = {};
   rows.forEach((r) => {
-    const key = r.girone_nome || 'N/A';
+    const key = r.girone_codice || 'N/A';
     if (!groups[key]) groups[key] = [];
     groups[key].push(r);
   });
 
   return (
-    <div>
+    <div className="standings-view">
       <h2>Classifica - {faseName}</h2>
       {loading ? (
         <p>Caricamento classifiche...</p>
       ) : rows.length === 0 ? (
         <p>Nessuna classifica disponibile.</p>
       ) : (
-        Object.keys(groups).map((gironeNome) => (
-          <div key={gironeNome} style={{ marginBottom: '1.5rem' }}>
-            <h3>Girone {gironeNome}</h3>
-            {groups[gironeNome].every((row) => row.partite_giocate === 0) && (
-              <p style={{ margin: '0.35rem 0 0', opacity: 0.8 }}>
+        Object.keys(groups).sort((a, b) => a.localeCompare(b, 'it')).map((gironeCodice) => (
+          <section key={gironeCodice} className="standings-group">
+            <h3>Girone {groups[gironeCodice][0]?.girone_nome || gironeCodice}</h3>
+            {groups[gironeCodice].every((row) => row.partite_giocate === 0) && (
+              <p className="standings-note">
                 Nessuna partita ancora giocata. Elenco partecipanti visibile.
               </p>
             )}
-            <div style={{ overflowX: 'auto' }}>
-              <table
-                style={{
-                  width: '100%',
-                  borderCollapse: 'collapse',
-                  marginTop: '0.5rem',
-                  minWidth: '580px'
-                }}
-              >
+            <div className="standings-table-scroll">
+              <table className="standings-table">
+                <colgroup>
+                  <col className="standings-col-pos" />
+                  <col className="standings-col-team" />
+                  <col className="standings-col-small" />
+                  <col className="standings-col-small" />
+                  <col className="standings-col-small" />
+                  <col className="standings-col-sets" />
+                  <col className="standings-col-points" />
+                </colgroup>
                 <thead>
                   <tr>
-                    <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Pos</th>
-                    <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Squadra</th>
-                    <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>PG</th>
-                    <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Vinte</th>
-                    <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Perse</th>
-                    <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Set V/P</th>
-                    <th style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}>Punti</th>
+                    <th>Pos</th>
+                    <th>Squadra</th>
+                    <th>PG</th>
+                    <th>Vinte</th>
+                    <th>Perse</th>
+                    <th>Set V/P</th>
+                    <th>Punti</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {groups[gironeNome].map((row) => (
+                  {groups[gironeCodice].map((row) => (
                     <tr key={row.squadra_codice}>
-                      <td style={{ padding: '0.25rem' }}>{row.posizione ?? '-'}</td>
-                      <td style={{ padding: '0.25rem' }}>{row.squadra_nome}</td>
-                      <td style={{ padding: '0.25rem' }}>{row.partite_giocate}</td>
-                      <td style={{ padding: '0.25rem' }}>{row.partite_vinte}</td>
-                      <td style={{ padding: '0.25rem' }}>{row.partite_perse}</td>
-                      <td style={{ padding: '0.25rem' }}>
+                      <td>{row.posizione ?? '-'}</td>
+                      <td>{row.squadra_nome}</td>
+                      <td>{row.partite_giocate}</td>
+                      <td>{row.partite_vinte}</td>
+                      <td>{row.partite_perse}</td>
+                      <td>
                         {row.set_vinti} / {row.set_persi}
                       </td>
-                      <td style={{ padding: '0.25rem' }}>{row.punti_classifica}</td>
+                      <td>{row.punti_classifica}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          </div>
+          </section>
         ))
       )}
     </div>

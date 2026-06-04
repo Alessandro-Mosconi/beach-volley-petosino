@@ -22,6 +22,15 @@ interface Tournament {
 type View = 'agenda' | 'partite' | 'classifica' | 'gold' | 'silver' | 'stats' | 'info_service';
 type Theme = 'dark' | 'light';
 const SELECTED_TEAM_STORAGE_KEY = 'beach-volley:selectedTeam';
+const NAV_ITEMS: Array<{ view: View; label: string }> = [
+  { view: 'agenda', label: 'Agenda' },
+  { view: 'partite', label: 'Partite' },
+  { view: 'classifica', label: 'Classifiche Gironi' },
+  { view: 'gold', label: 'Gold' },
+  { view: 'silver', label: 'Silver' },
+  { view: 'stats', label: 'Statistiche Squadra' },
+  { view: 'info_service', label: 'Info Service' }
+];
 
 function AuthPanel({
   session,
@@ -200,6 +209,7 @@ export default function App() {
   const [teamsLoadError, setTeamsLoadError] = useState<string | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [canEditResults, setCanEditResults] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>(() => {
     const storedTheme = window.localStorage.getItem('theme');
     return storedTheme === 'light' ? 'light' : 'dark';
@@ -243,6 +253,7 @@ export default function App() {
   useEffect(() => {
     const onPopState = () => {
       setView(viewFromPath(window.location.pathname));
+      setNavOpen(false);
     };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
@@ -263,6 +274,7 @@ export default function App() {
 
   const goToView = (nextView: View) => {
     setView(nextView);
+    setNavOpen(false);
     const nextPath = pathFromView(nextView);
     if (window.location.pathname !== nextPath) {
       window.history.pushState({}, '', nextPath);
@@ -349,7 +361,9 @@ export default function App() {
       <header className="app-header">
         <h1>Torneo Beach Volley</h1>
         <div className="header-actions">
-          <AuthPanel session={session} canEdit={canEditResults} onSessionChange={setSession} />
+          <div className="desktop-auth">
+            <AuthPanel session={session} canEdit={canEditResults} onSessionChange={setSession} />
+          </div>
           <button
             className="theme-toggle"
             type="button"
@@ -366,28 +380,55 @@ export default function App() {
             </span>
             <span className="theme-toggle-thumb" />
           </button>
+          <nav className="mobile-nav-menu" aria-label="Navigazione principale mobile">
+            <button
+              className="nav-menu-trigger"
+              type="button"
+              aria-label="Apri menu"
+              aria-expanded={navOpen}
+              aria-controls="main-navigation-menu"
+              onClick={() => setNavOpen((currentOpen) => !currentOpen)}
+            >
+              <span className="hamburger-icon" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </span>
+            </button>
+            {navOpen && (
+              <div id="main-navigation-menu" className="nav-menu-popover">
+                {NAV_ITEMS.map((item) => (
+                  <button
+                    key={item.view}
+                    type="button"
+                    className={view === item.view ? 'active' : ''}
+                    aria-current={view === item.view ? 'page' : undefined}
+                    onClick={() => goToView(item.view)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+                <div className="mobile-nav-auth">
+                  <AuthPanel session={session} canEdit={canEditResults} onSessionChange={setSession} />
+                </div>
+              </div>
+            )}
+          </nav>
         </div>
       </header>
       {/* Navigation */}
-      <nav className="tab-nav">
-        <button onClick={() => goToView('agenda')} disabled={view === 'agenda'}>
-          Agenda
-        </button>
-        <button onClick={() => goToView('partite')} disabled={view === 'partite'}>
-          Partite
-        </button>
-        <button onClick={() => goToView('classifica')} disabled={view === 'classifica'}>
-          Classifiche Gironi
-        </button>
-        <button onClick={() => goToView('gold')} disabled={view === 'gold'}>
-          Gold
-        </button>
-        <button onClick={() => goToView('silver')} disabled={view === 'silver'}>
-          Silver
-        </button>
-        <button onClick={() => goToView('stats')} disabled={view === 'stats'}>
-          Statistiche Squadra
-        </button>
+      <nav className="desktop-tab-nav" aria-label="Navigazione principale">
+        {NAV_ITEMS.map((item) => (
+          <button
+            key={item.view}
+            type="button"
+            className={view === item.view ? 'active' : ''}
+            aria-current={view === item.view ? 'page' : undefined}
+            onClick={() => goToView(item.view)}
+          >
+            {item.label}
+          </button>
+        ))}
       </nav>
       {/* Render chosen view */}
       <div className="section-panel">

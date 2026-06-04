@@ -29,7 +29,7 @@ type BracketViewMode = 'diagram' | 'cards';
 const BRACKET_ROUNDS = [
   { title: 'Quarti', slotIndexes: [0, 1, 2, 3] },
   { title: 'Semifinali', slotIndexes: [4, 5] },
-  { title: 'Finale', slotIndexes: [6] }
+  { title: 'Finali', slotIndexes: [6, 7] }
 ];
 
 const GRAPH_NODES = [
@@ -39,7 +39,8 @@ const GRAPH_NODES = [
   { slotIndex: 3, round: 'Quarto 4', x: 32, y: 546 },
   { slotIndex: 4, round: 'Semifinale 1', x: 360, y: 111 },
   { slotIndex: 5, round: 'Semifinale 2', x: 360, y: 459 },
-  { slotIndex: 6, round: 'Finale', x: 688, y: 285 }
+  { slotIndex: 6, round: 'Finale', x: 688, y: 198 },
+  { slotIndex: 7, round: 'Finalina', x: 688, y: 459 }
 ];
 
 const GRAPH_EDGES = [
@@ -47,8 +48,8 @@ const GRAPH_EDGES = [
   { from: 1, to: 4, path: 'M 256 270 H 306 V 183 H 360' },
   { from: 2, to: 5, path: 'M 256 444 H 306 V 531 H 360' },
   { from: 3, to: 5, path: 'M 256 618 H 306 V 531 H 360' },
-  { from: 4, to: 6, path: 'M 584 183 H 634 V 357 H 688' },
-  { from: 5, to: 6, path: 'M 584 531 H 634 V 357 H 688' }
+  { from: 4, to: 6, path: 'M 584 183 H 634 V 270 H 688' },
+  { from: 5, to: 6, path: 'M 584 531 H 634 V 270 H 688' }
 ];
 
 const SLOT_INDEX_BY_CODE: Record<string, number> = {
@@ -58,7 +59,8 @@ const SLOT_INDEX_BY_CODE: Record<string, number> = {
   QUARTI_4: 3,
   SEMIFINALE_1: 4,
   SEMIFINALE_2: 5,
-  FINALE: 6
+  FINALE: 6,
+  FINALINA: 7
 };
 
 function createEmptySlot(slotIndex: number): BracketSlot {
@@ -79,7 +81,7 @@ function createEmptySlot(slotIndex: number): BracketSlot {
 }
 
 function createSlots(matches: MatchData[]): BracketSlot[] {
-  const slots = Array.from({ length: 7 }, (_, index) => createEmptySlot(index));
+  const slots = Array.from({ length: 8 }, (_, index) => createEmptySlot(index));
   const usedSlots = new Set<number>();
 
   matches.forEach((match) => {
@@ -92,7 +94,7 @@ function createSlots(matches: MatchData[]): BracketSlot[] {
 
   matches
     .filter((match) => !match.slot_tabellone)
-    .slice(0, 7)
+    .slice(0, 8)
     .forEach((match) => {
       const slotIndex = slots.findIndex((slot, index) => slot.id < 0 && !usedSlots.has(index));
       if (slotIndex === -1) return;
@@ -107,6 +109,7 @@ function fallbackTeams(slotIndex: number) {
   if (slotIndex === 4) return ['Vincente Quarto 1', 'Vincente Quarto 2'];
   if (slotIndex === 5) return ['Vincente Quarto 3', 'Vincente Quarto 4'];
   if (slotIndex === 6) return ['Vincente Semifinale 1', 'Vincente Semifinale 2'];
+  if (slotIndex === 7) return ['Perdente Semifinale 1', 'Perdente Semifinale 2'];
   return ['Da assegnare', 'Da assegnare'];
 }
 

@@ -999,6 +999,74 @@ ul li {
   gap: 0.4rem;
 }
 
+.final-ranking-view {
+  display: grid;
+  gap: 1rem;
+}
+
+.final-ranking-view h2 {
+  margin-bottom: 0;
+}
+
+.final-ranking-list {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.final-ranking-row {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 0.75rem 0.85rem;
+  background: var(--card-bg);
+}
+
+.final-ranking-row-1 {
+  border-color: rgba(245, 158, 11, 0.55);
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.final-ranking-row-2 {
+  border-color: rgba(148, 163, 184, 0.5);
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.final-ranking-row-3 {
+  border-color: rgba(180, 83, 9, 0.45);
+  background: rgba(180, 83, 9, 0.1);
+}
+
+.final-ranking-position {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--input-bg);
+  color: var(--heading-color);
+  font-weight: 900;
+}
+
+.final-ranking-row strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--heading-color);
+}
+
+.final-ranking-row span:last-child {
+  color: var(--muted-text);
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
 .courts-view {
   display: flex;
   flex-direction: column;
@@ -1579,6 +1647,14 @@ ul li {
   .stats-team-select select {
     width: 100%;
     min-width: 0;
+  }
+
+  .final-ranking-row {
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+
+  .final-ranking-row span:last-child {
+    grid-column: 2;
   }
 
   .agenda-lunch-summary {

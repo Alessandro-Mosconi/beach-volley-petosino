@@ -25,26 +25,24 @@ end $$;
 
 do $$
 begin
-    if not exists (
-        select 1
-        from pg_constraint
-        where conname = 'chk_partita_slot_tabellone_valido'
-    ) then
-        alter table partita
-        add constraint chk_partita_slot_tabellone_valido
-        check (
-            slot_tabellone is null
-            or slot_tabellone in (
-                'QUARTI_1',
-                'QUARTI_2',
-                'QUARTI_3',
-                'QUARTI_4',
-                'SEMIFINALE_1',
-                'SEMIFINALE_2',
-                'FINALE'
-            )
-        );
-    end if;
+    alter table partita
+    drop constraint if exists chk_partita_slot_tabellone_valido;
+
+    alter table partita
+    add constraint chk_partita_slot_tabellone_valido
+    check (
+        slot_tabellone is null
+        or slot_tabellone in (
+            'QUARTI_1',
+            'QUARTI_2',
+            'QUARTI_3',
+            'QUARTI_4',
+            'SEMIFINALE_1',
+            'SEMIFINALE_2',
+            'FINALE',
+            'FINALINA'
+        )
+    );
 end $$;
 
 create unique index if not exists uq_partita_slot_tabellone

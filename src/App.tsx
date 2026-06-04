@@ -7,6 +7,7 @@ import Bracket from './components/Bracket';
 import TeamStats from './components/TeamStats';
 import InfoService from './components/InfoService';
 import MatchesByCourt from './components/MatchesByCourt';
+import FinalRanking from './components/FinalRanking';
 
 interface Team {
   codice: string;
@@ -19,15 +20,26 @@ interface Tournament {
   nome: string;
 }
 
-type View = 'agenda' | 'partite' | 'classifica' | 'gold' | 'silver' | 'stats' | 'info_service';
+type View =
+  | 'agenda'
+  | 'partite'
+  | 'classifica'
+  | 'gold'
+  | 'silver'
+  | 'gold_ranking'
+  | 'silver_ranking'
+  | 'stats'
+  | 'info_service';
 type Theme = 'dark' | 'light';
 const SELECTED_TEAM_STORAGE_KEY = 'beach-volley:selectedTeam';
-const NAV_ITEMS: Array<{ view: View; label: string }> = [
+const NAV_ITEMS: Array<{ view: View; label: string; rankingPhase?: 'GOLD' | 'SILVER' }> = [
   { view: 'agenda', label: 'Agenda' },
   { view: 'partite', label: 'Partite' },
   { view: 'classifica', label: 'Classifiche Gironi' },
   { view: 'gold', label: 'Gold' },
+  { view: 'gold_ranking', label: 'Classifica Gold', rankingPhase: 'GOLD' },
   { view: 'silver', label: 'Silver' },
+  { view: 'silver_ranking', label: 'Classifica Silver', rankingPhase: 'SILVER' },
   { view: 'stats', label: 'Statistiche Squadra' },
   { view: 'info_service', label: 'Info Service' }
 ];
@@ -166,8 +178,12 @@ function viewFromPath(pathname: string): View {
       return 'partite';
     case '/gold':
       return 'gold';
+    case '/classifica-gold':
+      return 'gold_ranking';
     case '/silver':
       return 'silver';
+    case '/classifica-silver':
+      return 'silver_ranking';
     case '/stats':
       return 'stats';
     case '/info_service':
@@ -187,8 +203,12 @@ function pathFromView(view: View): string {
       return '/partite';
     case 'gold':
       return '/gold';
+    case 'gold_ranking':
+      return '/classifica-gold';
     case 'silver':
       return '/silver';
+    case 'silver_ranking':
+      return '/classifica-silver';
     case 'stats':
       return '/stats';
     case 'info_service':
@@ -210,6 +230,10 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [canEditResults, setCanEditResults] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  const [finalRankingReady, setFinalRankingReady] = useState<Record<'GOLD' | 'SILVER', boolean>>({
+    GOLD: false,
+    SILVER: false
+  });
   const [theme, setTheme] = useState<Theme>(() => {
     const storedTheme = window.localStorage.getItem('theme');
     return storedTheme === 'light' ? 'light' : 'dark';
@@ -287,7 +311,71 @@ export default function App() {
     }
   }, [session, view]);
 
-  const visibleNavItems = NAV_ITEMS.filter((item) => item.view !== 'info_service' || Boolean(session));
+  useEffect(() => {
+    async function fetchFinalRankingReadiness() {
+      if (!activeTournament) {
+        setFinalRankingReady({ GOLD: false, SILVER: false });
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('v_partita_risultato')
+        .select('fase_torneo_codice, slot_tabellone, squadra_vincitrice_codice, squadra_perdente_codice, stato')
+        .eq('torneo_id', activeTournament.id)
+        .in('fase_torneo_codice', ['GOLD', 'SILVER'])
+        .in('slot_tabellone', ['FINALE', 'FINALINA']);
+
+      if (error || !data) {
+        setFinalRankingReady({ GOLD: false, SILVER: false });
+        return;
+      }
+
+      const isReady = (phase: 'GOLD' | 'SILVER') => {
+        const phaseMatches = data.filter((match) => match.fase_torneo_codice === phase);
+        return ['FINALE', 'FINALINA'].every((slot) =>
+          phaseMatches.some(
+            (match) =>
+              match.slot_tabellone === slot &&
+              match.stato === 'terminata' &&
+              match.squadra_vincitrice_codice &&
+              match.squadra_perdente_codice
+          )
+        );
+      };
+
+      setFinalRankingReady({
+        GOLD: isReady('GOLD'),
+        SILVER: isReady('SILVER')
+      });
+    }
+
+    fetchFinalRankingReadiness();
+
+    const channel = supabase
+      .channel('final-ranking-ready-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'partita' }, () => fetchFinalRankingReadiness())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'partita_set' }, () => fetchFinalRankingReadiness())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeTournament]);
+
+  useEffect(() => {
+    if (view === 'gold_ranking' && !finalRankingReady.GOLD) {
+      goToView('gold');
+    }
+    if (view === 'silver_ranking' && !finalRankingReady.SILVER) {
+      goToView('silver');
+    }
+  }, [finalRankingReady, view]);
+
+  const visibleNavItems = NAV_ITEMS.filter((item) => {
+    if (item.view === 'info_service' && !session) return false;
+    if (item.rankingPhase && !finalRankingReady[item.rankingPhase]) return false;
+    return true;
+  });
 
   useEffect(() => {
     async function fetchTournamentAndTeams() {
@@ -457,7 +545,9 @@ export default function App() {
         {view === 'classifica' && <Classifica faseName="GIRONI" tournamentId={activeTournament.id} />}
         {view === 'partite' && <MatchesByCourt tournamentId={activeTournament.id} canEdit={canEditResults} />}
         {view === 'gold' && <Bracket faseName="GOLD" tournamentId={activeTournament.id} />}
+        {view === 'gold_ranking' && <FinalRanking faseName="GOLD" tournamentId={activeTournament.id} />}
         {view === 'silver' && <Bracket faseName="SILVER" tournamentId={activeTournament.id} />}
+        {view === 'silver_ranking' && <FinalRanking faseName="SILVER" tournamentId={activeTournament.id} />}
         {view === 'stats' && selectedTeam && (
           <TeamStats
             teamId={selectedTeam}

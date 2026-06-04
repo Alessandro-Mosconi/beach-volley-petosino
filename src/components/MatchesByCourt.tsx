@@ -63,7 +63,8 @@ const BRACKET_SLOT_OPTIONS = [
   { value: 'QUARTI_4', label: 'Quarto 4' },
   { value: 'SEMIFINALE_1', label: 'Semifinale 1' },
   { value: 'SEMIFINALE_2', label: 'Semifinale 2' },
-  { value: 'FINALE', label: 'Finale' }
+  { value: 'FINALE', label: 'Finale' },
+  { value: 'FINALINA', label: 'Finalina 3/4 posto' }
 ];
 
 interface LunchEvent {
@@ -751,7 +752,11 @@ export default function MatchesByCourt({ tournamentId, canEdit }: MatchesByCourt
       partita_id: editingMatch.partita_id,
       numero_set: draft.numero_set,
       punteggio_squadra_1: Number(draft.punteggio_squadra_1),
-      punteggio_squadra_2: Number(draft.punteggio_squadra_2)
+      punteggio_squadra_2: Number(draft.punteggio_squadra_2),
+      squadra_vincitrice_codice:
+        Number(draft.punteggio_squadra_1) > Number(draft.punteggio_squadra_2)
+          ? editingMatch.squadra_1_codice
+          : editingMatch.squadra_2_codice
     }));
     const numbersToKeep = new Set(rowsToUpsert.map((row) => row.numero_set));
     const idsToDelete = currentSets

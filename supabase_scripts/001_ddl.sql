@@ -283,7 +283,8 @@ create table partita (
                 'QUARTI_4',
                 'SEMIFINALE_1',
                 'SEMIFINALE_2',
-                'FINALE'
+                'FINALE',
+                'FINALINA'
             )
         ),
 
@@ -397,12 +398,10 @@ begin
         raise exception 'Partita % non trovata', new.partita_id;
     end if;
 
-    if new.squadra_vincitrice_codice is null then
-        if new.punteggio_squadra_1 > new.punteggio_squadra_2 then
-            new.squadra_vincitrice_codice := v_squadra_1;
-        else
-            new.squadra_vincitrice_codice := v_squadra_2;
-        end if;
+    if new.punteggio_squadra_1 > new.punteggio_squadra_2 then
+        new.squadra_vincitrice_codice := v_squadra_1;
+    else
+        new.squadra_vincitrice_codice := v_squadra_2;
     end if;
 
     if new.squadra_vincitrice_codice not in (v_squadra_1, v_squadra_2) then
@@ -639,17 +638,18 @@ select
     ps.fase_torneo_codice,
     ps.squadra_codice,
     count(*) filter (where ps.risultato_squadra in ('VINTA', 'PERSA'))::integer as partite_giocate,
-    sum(ps.partita_vinta)::integer as partite_vinte,
-    sum(ps.partita_persa)::integer as partite_perse,
-    sum(ps.set_vinti)::integer as set_vinti,
-    sum(ps.set_persi)::integer as set_persi,
-    sum(ps.punti_fatti)::integer as punti_fatti,
-    sum(ps.punti_subiti)::integer as punti_subiti,
-    (sum(ps.set_vinti) - sum(ps.set_persi))::integer as differenza_set,
-    (sum(ps.punti_fatti) - sum(ps.punti_subiti))::integer as differenza_punti,
-    (sum(ps.partita_vinta) * 3)::integer as punti_classifica
+    coalesce(sum(ps.partita_vinta), 0)::integer as partite_vinte,
+    coalesce(sum(ps.partita_persa), 0)::integer as partite_perse,
+    coalesce(sum(ps.set_vinti), 0)::integer as set_vinti,
+    coalesce(sum(ps.set_persi), 0)::integer as set_persi,
+    coalesce(sum(ps.punti_fatti), 0)::integer as punti_fatti,
+    coalesce(sum(ps.punti_subiti), 0)::integer as punti_subiti,
+    (coalesce(sum(ps.set_vinti), 0) - coalesce(sum(ps.set_persi), 0))::integer as differenza_set,
+    (coalesce(sum(ps.punti_fatti), 0) - coalesce(sum(ps.punti_subiti), 0))::integer as differenza_punti,
+    (coalesce(sum(ps.partita_vinta), 0) * 3)::integer as punti_classifica
 from v_partita_squadra ps
 where ps.risultato_squadra in ('VINTA', 'PERSA')
+   or ps.set_vinti + ps.set_persi > 0
 group by
     ps.torneo_id,
     ps.girone_codice,

@@ -1356,9 +1356,7 @@ ul li {
 }
 
 .final-ranking-row-2 {
-  grid-template-columns: 66px minmax(0, 1fr);
   border-color: var(--card-border);
-  padding: 1.05rem;
   background: var(--card-bg);
 }
 
@@ -1382,26 +1380,12 @@ ul li {
   color: var(--heading-color);
 }
 
-.final-ranking-row-2 .final-ranking-position {
-  width: 48px;
-  height: 48px;
-  color: var(--heading-color);
-}
-
 .final-ranking-row-1 .final-ranking-position span {
   font-size: 1.55rem;
 }
 
-.final-ranking-row-2 .final-ranking-position span {
-  font-size: 1.3rem;
-}
-
 .final-ranking-row-1 .final-ranking-team strong {
   font-size: clamp(1.45rem, 3vw, 2rem);
-}
-
-.final-ranking-row-2 .final-ranking-team strong {
-  font-size: clamp(1.18rem, 2.2vw, 1.45rem);
 }
 
 .final-ranking-row-3::before {
@@ -1779,6 +1763,13 @@ ul li {
 
 .court-match-team-winner {
   color: var(--agenda-lunch);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.18em;
+}
+
+.court-match-team-draw {
+  color: var(--agenda-player);
   text-decoration: underline;
   text-decoration-thickness: 2px;
   text-underline-offset: 0.18em;
@@ -2314,8 +2305,7 @@ ul li {
     padding: 0.8rem;
   }
 
-  .final-ranking-row-1,
-  .final-ranking-row-2 {
+  .final-ranking-row-1 {
     grid-template-columns: 52px minmax(0, 1fr);
     padding: 0.95rem;
   }
@@ -2330,8 +2320,7 @@ ul li {
     height: 38px;
   }
 
-  .final-ranking-row-1 .final-ranking-position,
-  .final-ranking-row-2 .final-ranking-position {
+  .final-ranking-row-1 .final-ranking-position {
     width: 44px;
     height: 44px;
   }

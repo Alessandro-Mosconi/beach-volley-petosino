@@ -118,6 +118,8 @@ function formatMatchStatus(status: string) {
 }
 
 function getWinningSide(sets: MatchSet[]) {
+  if (sets.length === 0) return null;
+
   const setWins = sets.reduce(
     (wins, set) => {
       if (set.punteggio_squadra_1 > set.punteggio_squadra_2) return { ...wins, team1: wins.team1 + 1 };
@@ -129,6 +131,20 @@ function getWinningSide(sets: MatchSet[]) {
 
   if (setWins.team1 === setWins.team2) return null;
   return setWins.team1 > setWins.team2 ? 'team1' : 'team2';
+}
+
+function isDrawMatch(sets: MatchSet[]) {
+  if (sets.length === 0) return false;
+  const setWins = sets.reduce(
+    (wins, set) => {
+      if (set.punteggio_squadra_1 > set.punteggio_squadra_2) return { ...wins, team1: wins.team1 + 1 };
+      if (set.punteggio_squadra_2 > set.punteggio_squadra_1) return { ...wins, team2: wins.team2 + 1 };
+      return wins;
+    },
+    { team1: 0, team2: 0 }
+  );
+
+  return setWins.team1 === setWins.team2;
 }
 
 function MatchCell({
@@ -153,6 +169,7 @@ function MatchCell({
     : match.squadra_arbitro_nome ?? 'Da definire';
   const setList = formatSetList(sets);
   const winningSide = getWinningSide(sets);
+  const isDraw = isDrawMatch(sets);
 
   return (
     <article className={`court-match-card court-match-card-${match.stato}`}>
@@ -160,9 +177,9 @@ function MatchCell({
         <strong>{formatRound(match)}</strong>
       </div>
       <div className="court-match-teams">
-        <span className={winningSide === 'team1' ? 'court-match-team-winner' : undefined}>{match.squadra_1_nome}</span>
+        <span className={winningSide === 'team1' ? 'court-match-team-winner' : isDraw ? 'court-match-team-draw' : undefined}>{match.squadra_1_nome}</span>
         <small>vs</small>
-        <span className={winningSide === 'team2' ? 'court-match-team-winner' : undefined}>{match.squadra_2_nome}</span>
+        <span className={winningSide === 'team2' ? 'court-match-team-winner' : isDraw ? 'court-match-team-draw' : undefined}>{match.squadra_2_nome}</span>
       </div>
       <div className="court-match-details">
         <span>Arbitro: {referee}</span>

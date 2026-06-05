@@ -391,7 +391,7 @@ button:disabled {
   display: grid;
   gap: 0.35rem;
   width: min(280px, calc(100vw - 2rem));
-  max-height: min(620px, calc(100dvh - 92px));
+  max-height: min(520px, 55dvh);
   overflow-y: auto;
   overscroll-behavior: contain;
   border: 1px solid var(--surface-border);
@@ -428,13 +428,15 @@ button:disabled {
 }
 
 .mobile-nav-auth {
-  border-bottom: 1px solid var(--surface-border);
-  padding-bottom: 0.45rem;
+  border-top: 1px solid var(--surface-border);
+  margin-top: 0.25rem;
+  padding-top: 0.45rem;
 }
 
 .mobile-theme-toggle {
-  border-bottom: 1px solid var(--surface-border);
-  padding-bottom: 0.45rem;
+  border-top: 1px solid var(--surface-border);
+  margin-top: 0.25rem;
+  padding-top: 0.45rem;
 }
 
 .mobile-theme-toggle .theme-toggle {
@@ -455,13 +457,17 @@ button:disabled {
 }
 
 .mobile-nav-auth .auth-popover {
-  position: static;
-  width: 100%;
-  max-height: calc(100dvh - 160px);
+  position: fixed;
+  top: max(1rem, env(safe-area-inset-top));
+  left: 1rem;
+  right: 1rem;
+  z-index: 120;
+  width: auto;
+  max-height: calc(100dvh - 2rem);
   overflow-y: auto;
-  margin-top: 0.35rem;
+  margin: 0 auto;
   border-color: var(--card-border);
-  box-shadow: none;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
 }
 
 .section-panel {

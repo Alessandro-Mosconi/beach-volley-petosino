@@ -523,12 +523,6 @@ export default function App() {
             </button>
             {navOpen && (
               <div id="main-navigation-menu" className="nav-menu-popover">
-                <div className="mobile-nav-auth">
-                  <AuthPanel session={session} canEdit={canEditResults} onSessionChange={setSession} />
-                </div>
-                <div className="mobile-theme-toggle">
-                  <ThemeToggle theme={theme} onToggle={() => setTheme(theme === 'dark' ? 'light' : 'dark')} />
-                </div>
                 <div className="mobile-nav-links">
                   {visibleNavItems.map((item) => (
                     <button
@@ -541,6 +535,12 @@ export default function App() {
                       {item.label}
                     </button>
                   ))}
+                </div>
+                <div className="mobile-theme-toggle">
+                  <ThemeToggle theme={theme} onToggle={() => setTheme(theme === 'dark' ? 'light' : 'dark')} />
+                </div>
+                <div className="mobile-nav-auth">
+                  <AuthPanel session={session} canEdit={canEditResults} onSessionChange={setSession} />
                 </div>
               </div>
             )}

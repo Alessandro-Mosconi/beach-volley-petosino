@@ -38,6 +38,13 @@ interface SetBreakdownRow {
   risultato_squadra: string;
 }
 
+interface SetDetailRow {
+  numero_set: number;
+  vinto: boolean;
+  punti_fatti: number;
+  punti_subiti: number;
+}
+
 function getQualificationTier(position: number | null) {
   if (position === null) return null;
   if (position <= 2) return 'gold';
@@ -45,9 +52,16 @@ function getQualificationTier(position: number | null) {
   return null;
 }
 
+function getMatchOutcome(match: SetBreakdownRow) {
+  if (match.set_vinti === match.set_persi) return { label: 'Pareggio', className: 'standings-set-card-draw' };
+  if (match.set_vinti > match.set_persi) return { label: 'Vinto', className: 'standings-set-card-won' };
+  return { label: 'Perso', className: 'standings-set-card-lost' };
+}
+
 export default function Classifica({ faseName, tournamentId }: ClassificaProps) {
   const [rows, setRows] = useState<TeamRow[]>([]);
   const [setBreakdownByTeam, setSetBreakdownByTeam] = useState<Record<string, SetBreakdownRow[]>>({});
+  const [setDetailsByMatchTeam, setSetDetailsByMatchTeam] = useState<Record<string, SetDetailRow[]>>({});
   const [selectedSetTeam, setSelectedSetTeam] = useState<TeamRow | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -85,6 +99,29 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
       if (participantsRes.error || squadreRes.error || gironiRes.error || setBreakdownRes.error) {
         setRows([]);
         setSetBreakdownByTeam({});
+        setLoading(false);
+        return;
+      }
+
+      const matchIds = Array.from(new Set((setBreakdownRes.data ?? []).map((match) => match.partita_id)));
+      const [matchTeamsRes, setDetailsRes] = matchIds.length > 0
+        ? await Promise.all([
+            supabase
+              .from('v_partita_risultato')
+              .select('partita_id, squadra_1_codice, squadra_2_codice')
+              .in('partita_id', matchIds),
+            supabase
+              .from('partita_set')
+              .select('partita_id, numero_set, punteggio_squadra_1, punteggio_squadra_2, squadra_vincitrice_codice')
+              .in('partita_id', matchIds)
+              .order('numero_set', { ascending: true })
+          ])
+        : [{ data: [], error: null }, { data: [], error: null }];
+
+      if (matchTeamsRes.error || setDetailsRes.error) {
+        setRows([]);
+        setSetBreakdownByTeam({});
+        setSetDetailsByMatchTeam({});
         setLoading(false);
         return;
       }
@@ -180,6 +217,45 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
           nextBreakdownByTeam[key].push(match);
         });
       setSetBreakdownByTeam(nextBreakdownByTeam);
+
+      const matchTeams = new Map<number, { team1: string; team2: string }>();
+      matchTeamsRes.data?.forEach((match) => {
+        matchTeams.set(match.partita_id, {
+          team1: match.squadra_1_codice,
+          team2: match.squadra_2_codice
+        });
+      });
+
+      const nextSetDetailsByMatchTeam: Record<string, SetDetailRow[]> = {};
+      setDetailsRes.data?.forEach((set) => {
+        const matchTeamsRow = matchTeams.get(set.partita_id);
+        if (!matchTeamsRow) return;
+
+        const details = [
+          {
+            teamCode: matchTeamsRow.team1,
+            punti_fatti: set.punteggio_squadra_1,
+            punti_subiti: set.punteggio_squadra_2
+          },
+          {
+            teamCode: matchTeamsRow.team2,
+            punti_fatti: set.punteggio_squadra_2,
+            punti_subiti: set.punteggio_squadra_1
+          }
+        ];
+
+        details.forEach((detail) => {
+          const key = `${set.partita_id}-${detail.teamCode}`;
+          if (!nextSetDetailsByMatchTeam[key]) nextSetDetailsByMatchTeam[key] = [];
+          nextSetDetailsByMatchTeam[key].push({
+            numero_set: set.numero_set,
+            vinto: set.squadra_vincitrice_codice === detail.teamCode,
+            punti_fatti: detail.punti_fatti,
+            punti_subiti: detail.punti_subiti
+          });
+        });
+      });
+      setSetDetailsByMatchTeam(nextSetDetailsByMatchTeam);
       setLoading(false);
     }
     fetchData();
@@ -274,10 +350,25 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
                 <tbody>
                   {groups[gironeCodice].map((row) => {
                     const qualificationTier = getQualificationTier(row.posizione);
+                    const hasSetDetails = row.set_vinti + row.set_persi > 0;
                     return (
                       <tr
                         key={row.squadra_codice}
-                        className={qualificationTier ? `standings-row-${qualificationTier}` : undefined}
+                        className={[
+                          qualificationTier ? `standings-row-${qualificationTier}` : '',
+                          hasSetDetails ? 'standings-clickable-row' : ''
+                        ].filter(Boolean).join(' ') || undefined}
+                        tabIndex={hasSetDetails ? 0 : undefined}
+                        role={hasSetDetails ? 'button' : undefined}
+                        aria-label={hasSetDetails ? `Apri scontri di ${row.squadra_nome}` : undefined}
+                        onClick={hasSetDetails ? () => setSelectedSetTeam(row) : undefined}
+                        onKeyDown={(event) => {
+                          if (!hasSetDetails) return;
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            setSelectedSetTeam(row);
+                          }
+                        }}
                       >
                         <td>{row.posizione ?? '-'}</td>
                         <td>
@@ -296,14 +387,7 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
                         <td>{row.partite_pareggiate}</td>
                         <td>{row.partite_perse}</td>
                         <td>
-                          <button
-                            className="standings-set-detail-button"
-                            type="button"
-                            disabled={row.set_vinti + row.set_persi === 0}
-                            onClick={() => setSelectedSetTeam(row)}
-                          >
-                            {row.set_vinti} / {row.set_persi}
-                          </button>
+                          <span className="standings-set-value">{row.set_vinti} / {row.set_persi}</span>
                         </td>
                         <td>{row.punti_fatti}</td>
                         <td>{row.punti_subiti}</td>
@@ -323,7 +407,7 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
             <section className="standings-set-modal" role="dialog" aria-modal="true" aria-labelledby="set-detail-title" onClick={(event) => event.stopPropagation()}>
               <div className="standings-set-modal-heading">
                 <div>
-                  <span>Set V/P</span>
+                  <span>Scontri</span>
                   <h3 id="set-detail-title">{selectedSetTeam.squadra_nome}</h3>
                 </div>
                 <button type="button" onClick={() => setSelectedSetTeam(null)} aria-label="Chiudi dettaglio set">
@@ -334,23 +418,37 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
               {selectedSetRows.length === 0 ? (
                 <p className="standings-set-empty">Nessun set giocato per questa squadra.</p>
               ) : (
-                <div className="standings-set-list">
-                  {selectedSetRows.map((match) => (
-                    <article key={match.partita_id} className="standings-set-card">
-                      <div>
-                        <span>Avversaria</span>
-                        <strong>{match.avversaria_nome}</strong>
-                      </div>
-                      <div className="standings-set-card-score">
-                        <span>Set</span>
-                        <strong>{match.set_vinti} / {match.set_persi}</strong>
-                      </div>
-                      <div className="standings-set-card-points">
-                        <span>Punti</span>
-                        <strong>{match.punti_fatti} / {match.punti_subiti}</strong>
-                      </div>
-                    </article>
-                  ))}
+                <div className="standings-set-list standings-set-list-scroll">
+                  {selectedSetRows.map((match) => {
+                    const setDetails = setDetailsByMatchTeam[`${match.partita_id}-${match.squadra_codice}`] ?? [];
+                    const outcome = getMatchOutcome(match);
+                    return (
+                      <article key={match.partita_id} className={`standings-set-card ${outcome.className}`}>
+                        <div className="standings-set-card-matchup">
+                          <span>Scontro diretto</span>
+                          <strong>{selectedSetTeam.squadra_nome}</strong>
+                          <small>contro {match.avversaria_nome}</small>
+                        </div>
+                        <div className="standings-set-card-summary">
+                          <span className="standings-set-outcome">{outcome.label}</span>
+                          <strong>
+                            {match.set_vinti} set vinti, {match.set_persi} persi
+                          </strong>
+                          <small>{match.punti_fatti} punti fatti, {match.punti_subiti} subiti</small>
+                        </div>
+                        <div className="standings-set-chip-list" aria-label="Dettaglio set">
+                          {setDetails.map((setDetail) => (
+                            <span
+                              key={setDetail.numero_set}
+                              className={`standings-set-chip ${setDetail.vinto ? 'standings-set-chip-won' : 'standings-set-chip-lost'}`}
+                            >
+                              Set {setDetail.numero_set}: {setDetail.vinto ? 'vinto' : 'perso'} {setDetail.punti_fatti}-{setDetail.punti_subiti}
+                            </span>
+                          ))}
+                        </div>
+                      </article>
+                    );
+                  })}
                 </div>
               )}
             </section>

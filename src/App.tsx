@@ -523,22 +523,24 @@ export default function App() {
             </button>
             {navOpen && (
               <div id="main-navigation-menu" className="nav-menu-popover">
-                {visibleNavItems.map((item) => (
-                  <button
-                    key={item.view}
-                    type="button"
-                    className={view === item.view ? 'active' : ''}
-                    aria-current={view === item.view ? 'page' : undefined}
-                    onClick={() => goToView(item.view)}
-                  >
-                    {item.label}
-                  </button>
-                ))}
+                <div className="mobile-nav-auth">
+                  <AuthPanel session={session} canEdit={canEditResults} onSessionChange={setSession} />
+                </div>
                 <div className="mobile-theme-toggle">
                   <ThemeToggle theme={theme} onToggle={() => setTheme(theme === 'dark' ? 'light' : 'dark')} />
                 </div>
-                <div className="mobile-nav-auth">
-                  <AuthPanel session={session} canEdit={canEditResults} onSessionChange={setSession} />
+                <div className="mobile-nav-links">
+                  {visibleNavItems.map((item) => (
+                    <button
+                      key={item.view}
+                      type="button"
+                      className={view === item.view ? 'active' : ''}
+                      aria-current={view === item.view ? 'page' : undefined}
+                      onClick={() => goToView(item.view)}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
                 </div>
               </div>
             )}

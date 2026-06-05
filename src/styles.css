@@ -391,11 +391,19 @@ button:disabled {
   display: grid;
   gap: 0.35rem;
   width: min(280px, calc(100vw - 2rem));
+  max-height: min(620px, calc(100dvh - 92px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
   border: 1px solid var(--surface-border);
   border-radius: 18px;
   padding: 0.45rem;
   background: var(--surface-bg);
   box-shadow: 0 14px 34px var(--surface-shadow);
+}
+
+.mobile-nav-links {
+  display: grid;
+  gap: 0.35rem;
 }
 
 .nav-menu-popover button {
@@ -420,15 +428,13 @@ button:disabled {
 }
 
 .mobile-nav-auth {
-  border-top: 1px solid var(--surface-border);
-  margin-top: 0.25rem;
-  padding-top: 0.45rem;
+  border-bottom: 1px solid var(--surface-border);
+  padding-bottom: 0.45rem;
 }
 
 .mobile-theme-toggle {
-  border-top: 1px solid var(--surface-border);
-  margin-top: 0.25rem;
-  padding-top: 0.45rem;
+  border-bottom: 1px solid var(--surface-border);
+  padding-bottom: 0.45rem;
 }
 
 .mobile-theme-toggle .theme-toggle {
@@ -451,6 +457,8 @@ button:disabled {
 .mobile-nav-auth .auth-popover {
   position: static;
   width: 100%;
+  max-height: calc(100dvh - 160px);
+  overflow-y: auto;
   margin-top: 0.35rem;
   border-color: var(--card-border);
   box-shadow: none;
@@ -744,6 +752,20 @@ ul li {
   color: var(--muted-text);
   font-size: 0.78em;
   font-weight: 800;
+}
+
+.agenda-match-team-winner {
+  color: var(--agenda-lunch);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.18em;
+}
+
+.agenda-match-team-draw {
+  color: var(--agenda-player);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.18em;
 }
 
 .agenda-event-body p {
@@ -1082,23 +1104,19 @@ ul li {
   color: var(--muted-text);
 }
 
-.standings-set-detail-button {
-  min-width: 62px;
-  border-color: var(--table-border);
-  border-radius: 999px;
-  padding: 0.28rem 0.55rem;
-  background: var(--input-bg);
-  color: var(--heading-color);
-  font-weight: 850;
+.standings-set-value {
+  color: inherit;
+  font-weight: inherit;
 }
 
-.standings-set-detail-button:hover:enabled {
-  border-color: var(--agenda-player);
-  background: var(--agenda-player-soft);
+.standings-clickable-row {
+  cursor: pointer;
 }
 
-.standings-set-detail-button:disabled {
-  cursor: default;
+.standings-clickable-row:hover,
+.standings-clickable-row:focus-visible {
+  outline: none;
+  background: rgba(56, 189, 248, 0.08);
 }
 
 .standings-set-modal-backdrop {
@@ -1114,7 +1132,9 @@ ul li {
 .standings-set-modal {
   width: min(520px, 100%);
   max-height: min(760px, calc(100vh - 2rem));
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   border: 1px solid var(--surface-border);
   border-radius: 22px;
   padding: 1rem;
@@ -1123,6 +1143,7 @@ ul li {
 }
 
 .standings-set-modal-heading {
+  flex: 0 0 auto;
   display: flex;
   justify-content: space-between;
   gap: 1rem;
@@ -1158,15 +1179,36 @@ ul li {
   gap: 0.65rem;
 }
 
+.standings-set-list-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
 .standings-set-card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 88px 96px;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 0.9fr) minmax(180px, 1.1fr);
   gap: 0.65rem;
-  align-items: center;
+  align-items: stretch;
   border: 1px solid var(--card-border);
   border-radius: 16px;
   padding: 0.75rem;
   background: var(--card-bg);
+}
+
+.standings-set-card-won {
+  border-color: rgba(52, 211, 153, 0.55);
+  background: linear-gradient(90deg, var(--agenda-lunch-soft), var(--card-bg));
+}
+
+.standings-set-card-lost {
+  border-color: rgba(248, 113, 113, 0.45);
+  background: linear-gradient(90deg, rgba(248, 113, 113, 0.12), var(--card-bg));
+}
+
+.standings-set-card-draw {
+  border-color: rgba(56, 189, 248, 0.5);
+  background: linear-gradient(90deg, var(--agenda-player-soft), var(--card-bg));
 }
 
 .standings-set-card span {
@@ -1186,9 +1228,75 @@ ul li {
   white-space: nowrap;
 }
 
-.standings-set-card-score,
-.standings-set-card-points {
-  text-align: center;
+.standings-set-card-matchup small,
+.standings-set-card-summary small {
+  display: block;
+  margin-top: 0.22rem;
+  color: var(--muted-text);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.standings-set-outcome {
+  width: max-content;
+  border-radius: 999px;
+  padding: 0.22rem 0.52rem;
+  background: rgba(148, 163, 184, 0.14);
+  color: var(--heading-color) !important;
+}
+
+.standings-set-card-won .standings-set-outcome {
+  background: var(--agenda-lunch-soft);
+  color: var(--agenda-lunch) !important;
+}
+
+.standings-set-card-lost .standings-set-outcome {
+  background: rgba(248, 113, 113, 0.14);
+  color: #fecaca !important;
+}
+
+:root[data-theme='light'] .standings-set-card-lost .standings-set-outcome {
+  color: #991b1b !important;
+}
+
+.standings-set-card-draw .standings-set-outcome {
+  background: var(--agenda-player-soft);
+  color: var(--agenda-player) !important;
+}
+
+.standings-set-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-content: center;
+}
+
+.standings-set-chip-list .standings-set-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--card-border);
+  border-radius: 999px;
+  padding: 0.28rem 0.52rem;
+  font-size: 0.76rem;
+  font-weight: 850;
+  line-height: 1.1;
+  text-transform: none;
+}
+
+.standings-set-chip-won {
+  border-color: var(--agenda-lunch);
+  background: var(--agenda-lunch-soft);
+  color: var(--agenda-lunch) !important;
+}
+
+.standings-set-chip-lost {
+  border-color: rgba(248, 113, 113, 0.42);
+  background: rgba(248, 113, 113, 0.13);
+  color: #fecaca !important;
+}
+
+:root[data-theme='light'] .standings-set-chip-lost {
+  color: #991b1b !important;
 }
 
 .standings-col-pos {
@@ -1730,10 +1838,21 @@ ul li {
   border-color: var(--agenda-lunch);
 }
 
+.court-match-card-won {
+  border-color: rgba(52, 211, 153, 0.55);
+  background: linear-gradient(180deg, var(--agenda-lunch-soft), var(--card-bg));
+}
+
+.court-match-card-draw {
+  border-color: rgba(56, 189, 248, 0.5);
+  background: linear-gradient(180deg, var(--agenda-player-soft), var(--card-bg));
+}
+
 .court-match-topline {
   display: flex;
-  justify-content: flex-start;
+  justify-content: space-between;
   gap: 0.55rem;
+  align-items: center;
   color: var(--muted-text);
   font-size: 0.78rem;
   font-weight: 750;
@@ -1742,6 +1861,29 @@ ul li {
 .court-match-topline strong {
   color: var(--table-header);
   white-space: nowrap;
+}
+
+.court-match-outcome {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-radius: 999px;
+  padding: 0.16rem 0.46rem;
+  background: rgba(148, 163, 184, 0.14);
+  color: var(--heading-color);
+  font-size: 0.72rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.court-match-card-won .court-match-outcome {
+  background: var(--agenda-lunch-soft);
+  color: var(--agenda-lunch);
+}
+
+.court-match-card-draw .court-match-outcome {
+  background: var(--agenda-player-soft);
+  color: var(--agenda-player);
 }
 
 .court-match-teams {
@@ -2163,15 +2305,34 @@ ul li {
     box-shadow: 0 12px 28px rgba(3, 9, 23, 0.12);
   }
 
+  .team-stats-card-clickable {
+    cursor: pointer;
+  }
+
+  .team-stats-card-clickable:hover,
+  .team-stats-card-clickable:focus-visible {
+    outline: 2px solid var(--agenda-player);
+    outline-offset: 2px;
+  }
+
   .team-stats-card-heading {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
+    justify-content: space-between;
     gap: 0.45rem;
     margin-bottom: 0.65rem;
     min-width: 0;
   }
 
-  .team-stats-card-heading span {
+  .team-stats-card-title {
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .team-stats-card-title span {
     flex: 0 0 auto;
     color: var(--muted-text);
     font-size: 0.76rem;
@@ -2179,7 +2340,7 @@ ul li {
     text-transform: uppercase;
   }
 
-  .team-stats-card-heading strong {
+  .team-stats-card-title strong {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -2188,7 +2349,7 @@ ul li {
     white-space: nowrap;
   }
 
-  .team-stats-card-heading .standings-qualification {
+  .team-stats-card-title .standings-qualification {
     flex: 0 0 auto;
   }
 
@@ -2294,31 +2455,6 @@ ul li {
     font-size: 1rem;
   }
 
-  .team-stats-set-card {
-    cursor: pointer;
-  }
-
-  .team-stats-set-card strong {
-    text-decoration: underline;
-    text-decoration-thickness: 2px;
-    text-underline-offset: 0.2em;
-  }
-
-  .team-stats-set-card:hover:enabled {
-    border-color: var(--agenda-player);
-    background: var(--agenda-player-soft);
-  }
-
-  .team-stats-set-card:disabled {
-    cursor: default;
-    opacity: 1;
-  }
-
-  .team-stats-set-card:disabled strong {
-    color: var(--muted-text);
-    text-decoration: none;
-  }
-
   .rules-grid,
   .rules-brackets {
     grid-template-columns: 1fr;
@@ -2363,9 +2499,8 @@ ul li {
     align-items: stretch;
   }
 
-  .standings-set-card-score,
-  .standings-set-card-points {
-    text-align: left;
+  .standings-set-chip-list {
+    align-content: flex-start;
   }
 
   .final-ranking-row {

@@ -12,8 +12,13 @@ interface MatchEvent {
   orario_inizio: string;
   campo: string;
   detail: string;
+  partita_id?: number;
   team1?: string;
   team2?: string;
+  team1Code?: string;
+  team2Code?: string;
+  setWins1?: number;
+  setWins2?: number;
   role: 'player' | 'referee' | 'lunch';
   status: string;
 }
@@ -139,6 +144,29 @@ export default function Agenda({ teamId, teams, tournamentId, onTeamChange }: Ag
         return;
       }
 
+      const matchIds = Array.from(
+        new Set(
+          data
+            .map((eventRow) => eventRow.partita_id)
+            .filter((partitaId): partitaId is number => typeof partitaId === 'number')
+        )
+      );
+      const resultsByMatch = new Map<number, { setWins1: number; setWins2: number }>();
+
+      if (matchIds.length > 0) {
+        const { data: resultsData } = await supabase
+          .from('v_partita_risultato')
+          .select('partita_id, set_vinti_squadra_1, set_vinti_squadra_2')
+          .in('partita_id', matchIds);
+
+        resultsData?.forEach((resultRow) => {
+          resultsByMatch.set(resultRow.partita_id, {
+            setWins1: resultRow.set_vinti_squadra_1 ?? 0,
+            setWins2: resultRow.set_vinti_squadra_2 ?? 0
+          });
+        });
+      }
+
       const eventsList: MatchEvent[] = data.map((eventRow) => {
         if (eventRow.tipo_evento === 'PRANZO') {
           return {
@@ -156,14 +184,20 @@ export default function Agenda({ teamId, teams, tournamentId, onTeamChange }: Ag
           eventRow.squadra_1_nome && eventRow.squadra_2_nome
             ? `${eventRow.squadra_1_nome} vs ${eventRow.squadra_2_nome}`
             : eventRow.squadra_avversaria_nome ?? 'Partita';
+        const result = eventRow.partita_id ? resultsByMatch.get(eventRow.partita_id) : undefined;
 
         return {
           id: `${eventRow.tipo_evento}-${eventRow.partita_id}`,
+          partita_id: eventRow.partita_id,
           orario_inizio: eventRow.orario_inizio,
           campo: eventRow.campo_nome ?? '',
           detail: matchup,
+          team1Code: eventRow.squadra_1_codice ?? undefined,
           team1: eventRow.squadra_1_nome ?? undefined,
+          team2Code: eventRow.squadra_2_codice ?? undefined,
           team2: eventRow.squadra_2_nome ?? undefined,
+          setWins1: result?.setWins1 ?? 0,
+          setWins2: result?.setWins2 ?? 0,
           role: isReferee ? 'referee' : 'player',
           status: eventRow.stato ?? ''
         };
@@ -230,13 +264,23 @@ export default function Agenda({ teamId, teams, tournamentId, onTeamChange }: Ag
   const shouldShowStatus = (event: MatchEvent) =>
     event.role !== 'lunch' && event.status.trim().toLowerCase() !== 'programmata';
 
+  const getTeamClassName = (event: MatchEvent, side: 'team1' | 'team2') => {
+    const setWins1 = event.setWins1 ?? 0;
+    const setWins2 = event.setWins2 ?? 0;
+    if (setWins1 + setWins2 === 0) return undefined;
+    if (setWins1 === setWins2) return 'agenda-match-team-draw';
+    if (side === 'team1' && setWins1 > setWins2) return 'agenda-match-team-winner';
+    if (side === 'team2' && setWins2 > setWins1) return 'agenda-match-team-winner';
+    return undefined;
+  };
+
   const renderEventTitle = (event: MatchEvent) => {
     if (event.team1 && event.team2) {
       return (
         <span className="agenda-match-title">
-          <span>{event.team1}</span>
+          <span className={getTeamClassName(event, 'team1')}>{event.team1}</span>
           <small>vs</small>
-          <span>{event.team2}</span>
+          <span className={getTeamClassName(event, 'team2')}>{event.team2}</span>
         </span>
       );
     }
@@ -317,6 +361,9 @@ export default function Agenda({ teamId, teams, tournamentId, onTeamChange }: Ag
                 </div>
                 <div className="agenda-event-meta">
                   {e.campo && <span><AgendaIcon name="mapPin" />{e.campo}</span>}
+                  {e.role !== 'lunch' && (e.setWins1 ?? 0) + (e.setWins2 ?? 0) > 0 && (
+                    <span>Set {e.setWins1} / {e.setWins2}</span>
+                  )}
                 </div>
               </div>
             </li>

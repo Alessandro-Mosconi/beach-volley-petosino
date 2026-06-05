@@ -117,10 +117,8 @@ function formatMatchStatus(status: string) {
   }
 }
 
-function getWinningSide(sets: MatchSet[]) {
-  if (sets.length === 0) return null;
-
-  const setWins = sets.reduce(
+function getSetWins(sets: MatchSet[]) {
+  return sets.reduce(
     (wins, set) => {
       if (set.punteggio_squadra_1 > set.punteggio_squadra_2) return { ...wins, team1: wins.team1 + 1 };
       if (set.punteggio_squadra_2 > set.punteggio_squadra_1) return { ...wins, team2: wins.team2 + 1 };
@@ -128,6 +126,12 @@ function getWinningSide(sets: MatchSet[]) {
     },
     { team1: 0, team2: 0 }
   );
+}
+
+function getWinningSide(sets: MatchSet[]) {
+  if (sets.length === 0) return null;
+
+  const setWins = getSetWins(sets);
 
   if (setWins.team1 === setWins.team2) return null;
   return setWins.team1 > setWins.team2 ? 'team1' : 'team2';
@@ -135,16 +139,28 @@ function getWinningSide(sets: MatchSet[]) {
 
 function isDrawMatch(sets: MatchSet[]) {
   if (sets.length === 0) return false;
-  const setWins = sets.reduce(
-    (wins, set) => {
-      if (set.punteggio_squadra_1 > set.punteggio_squadra_2) return { ...wins, team1: wins.team1 + 1 };
-      if (set.punteggio_squadra_2 > set.punteggio_squadra_1) return { ...wins, team2: wins.team2 + 1 };
-      return wins;
-    },
-    { team1: 0, team2: 0 }
-  );
-
+  const setWins = getSetWins(sets);
   return setWins.team1 === setWins.team2;
+}
+
+function getMatchOutcome(match: CourtMatch, sets: MatchSet[]) {
+  if (sets.length === 0) return null;
+
+  const setWins = getSetWins(sets);
+  if (setWins.team1 === setWins.team2) {
+    return {
+      label: 'Pareggio',
+      detail: `${setWins.team1}-${setWins.team2} nei set`,
+      className: 'court-match-card-draw'
+    };
+  }
+
+  const winnerName = setWins.team1 > setWins.team2 ? match.squadra_1_nome : match.squadra_2_nome;
+  return {
+    label: `Vince ${winnerName}`,
+    detail: `${setWins.team1}-${setWins.team2} nei set`,
+    className: 'court-match-card-won'
+  };
 }
 
 function MatchCell({
@@ -170,11 +186,17 @@ function MatchCell({
   const setList = formatSetList(sets);
   const winningSide = getWinningSide(sets);
   const isDraw = isDrawMatch(sets);
+  const outcome = getMatchOutcome(match, sets);
 
   return (
-    <article className={`court-match-card court-match-card-${match.stato}`}>
+    <article className={`court-match-card court-match-card-${match.stato} ${outcome?.className ?? ''}`}>
       <div className="court-match-topline">
         <strong>{formatRound(match)}</strong>
+        {outcome && (
+          <span className="court-match-outcome">
+            {outcome.label}
+          </span>
+        )}
       </div>
       <div className="court-match-teams">
         <span className={winningSide === 'team1' ? 'court-match-team-winner' : isDraw ? 'court-match-team-draw' : undefined}>{match.squadra_1_nome}</span>
@@ -184,6 +206,7 @@ function MatchCell({
       <div className="court-match-details">
         <span>Arbitro: {referee}</span>
         {shouldShowMatchStatus(match.stato) && <span>{formatMatchStatus(match.stato)}</span>}
+        {outcome && <span>{outcome.detail}</span>}
         {setList && <span>Set: {setList}</span>}
       </div>
       {canEdit && (

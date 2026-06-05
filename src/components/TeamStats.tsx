@@ -20,7 +20,9 @@ interface StatRow {
   fase_nome: string;
   girone_nome: string | null;
   girone_codice: string | null;
-  posizione: number;
+  posizione: number | null;
+  tabellone_turno: string | null;
+  squadra_nome: string;
   partite_giocate: number;
   partite_vinte: number;
   partite_pareggiate: number;
@@ -35,14 +37,24 @@ interface StatRow {
 
 interface SetBreakdownRow {
   partita_id: number;
+  squadra_codice: string;
   fase_torneo_codice: string;
   girone_codice: string | null;
+  slot_tabellone: string | null;
   avversaria_nome: string;
   set_vinti: number;
   set_persi: number;
   punti_fatti: number;
   punti_subiti: number;
   orario_inizio: string;
+  risultato_squadra: string;
+}
+
+interface SetDetailRow {
+  numero_set: number;
+  vinto: boolean;
+  punti_fatti: number;
+  punti_subiti: number;
 }
 
 function getQualificationTier(position: number | null, gironeCodice: string | null) {
@@ -52,9 +64,37 @@ function getQualificationTier(position: number | null, gironeCodice: string | nu
   return null;
 }
 
+function getMatchOutcome(match: SetBreakdownRow) {
+  if (match.set_vinti === match.set_persi) return { label: 'Pareggio', className: 'standings-set-card-draw' };
+  if (match.set_vinti > match.set_persi) return { label: 'Vinto', className: 'standings-set-card-won' };
+  return { label: 'Perso', className: 'standings-set-card-lost' };
+}
+
+function isBracketPhase(phaseCode: string) {
+  return phaseCode === 'GOLD' || phaseCode === 'SILVER';
+}
+
+function getBracketSlotRank(slot: string | null) {
+  if (!slot) return 0;
+  if (slot.startsWith('QUARTI')) return 1;
+  if (slot.startsWith('SEMIFINALE')) return 2;
+  if (slot === 'FINALE' || slot === 'FINALINA') return 3;
+  return 0;
+}
+
+function formatBracketSlot(slot: string | null) {
+  if (!slot) return '-';
+  if (slot.startsWith('QUARTI')) return 'Quarti';
+  if (slot.startsWith('SEMIFINALE')) return 'Semifinale';
+  if (slot === 'FINALE') return 'Finale';
+  if (slot === 'FINALINA') return 'Finalina';
+  return slot;
+}
+
 export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }: TeamStatsProps) {
   const [stats, setStats] = useState<StatRow[]>([]);
   const [setBreakdown, setSetBreakdown] = useState<SetBreakdownRow[]>([]);
+  const [setDetailsByMatchTeam, setSetDetailsByMatchTeam] = useState<Record<string, SetDetailRow[]>>({});
   const [selectedSetStat, setSelectedSetStat] = useState<StatRow | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const team = teams.find((t) => t.codice === teamId);
@@ -63,11 +103,11 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
     async function fetchStats() {
       setLoading(true);
 
-      const [statsRes, breakdownRes] = await Promise.all([
+      const [statsRes, breakdownRes, finalRankingRes] = await Promise.all([
         supabase
           .from('v_classifica_ordinata')
           .select(
-            'fase_torneo_codice, fase_nome, girone_codice, girone_nome, posizione, partite_giocate, partite_vinte, partite_perse, set_vinti, set_persi, punti_fatti, punti_subiti, differenza_punti, punti_classifica'
+            'fase_torneo_codice, fase_nome, girone_codice, girone_nome, posizione, squadra_nome, partite_giocate, partite_vinte, partite_perse, set_vinti, set_persi, punti_fatti, punti_subiti, differenza_punti, punti_classifica'
           )
           .eq('torneo_id', tournamentId)
           .eq('squadra_codice', teamId)
@@ -75,26 +115,75 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
         supabase
           .from('v_partita_squadra')
           .select(
-            'partita_id, fase_torneo_codice, girone_codice, avversaria_nome, set_vinti, set_persi, punti_fatti, punti_subiti, orario_inizio'
+            'partita_id, squadra_codice, fase_torneo_codice, girone_codice, slot_tabellone, avversaria_nome, set_vinti, set_persi, punti_fatti, punti_subiti, orario_inizio, risultato_squadra'
           )
           .eq('torneo_id', tournamentId)
           .eq('squadra_codice', teamId)
-          .order('orario_inizio', { ascending: true })
+          .order('orario_inizio', { ascending: true }),
+        supabase
+          .from('v_classifica_finale')
+          .select('fase_torneo_codice, posizione')
+          .eq('torneo_id', tournamentId)
+          .eq('squadra_codice', teamId)
       ]);
 
-      if (statsRes.error || !statsRes.data || breakdownRes.error) {
+      if (statsRes.error || !statsRes.data || breakdownRes.error || finalRankingRes.error) {
         setStats([]);
         setSetBreakdown([]);
+        setSetDetailsByMatchTeam({});
         setLoading(false);
         return;
       }
+
+      const matchIds = Array.from(new Set((breakdownRes.data ?? []).map((match) => match.partita_id)));
+      const [matchTeamsRes, setDetailsRes] = matchIds.length > 0
+        ? await Promise.all([
+            supabase
+              .from('v_partita_risultato')
+              .select('partita_id, squadra_1_codice, squadra_2_codice')
+              .in('partita_id', matchIds),
+            supabase
+              .from('partita_set')
+              .select('partita_id, numero_set, punteggio_squadra_1, punteggio_squadra_2, squadra_vincitrice_codice')
+              .in('partita_id', matchIds)
+              .order('numero_set', { ascending: true })
+          ])
+        : [{ data: [], error: null }, { data: [], error: null }];
+
+      if (matchTeamsRes.error || setDetailsRes.error) {
+        setStats([]);
+        setSetBreakdown([]);
+        setSetDetailsByMatchTeam({});
+        setLoading(false);
+        return;
+      }
+
+      const finalPositionByPhase = new Map<string, number>();
+      finalRankingRes.data?.forEach((row) => {
+        finalPositionByPhase.set(row.fase_torneo_codice, row.posizione);
+      });
+
+      const bracketSlotByPhase = new Map<string, string>();
+      (breakdownRes.data ?? []).forEach((match) => {
+        if (!isBracketPhase(match.fase_torneo_codice)) return;
+        const currentSlot = bracketSlotByPhase.get(match.fase_torneo_codice) ?? null;
+        if (getBracketSlotRank(match.slot_tabellone) > getBracketSlotRank(currentSlot)) {
+          bracketSlotByPhase.set(match.fase_torneo_codice, match.slot_tabellone ?? '');
+        }
+      });
 
       const formatted: StatRow[] = statsRes.data.map((r) => ({
         fase_torneo_codice: r.fase_torneo_codice,
         fase_nome: r.fase_nome ?? '',
         girone_codice: r.girone_codice ?? null,
         girone_nome: r.girone_nome ?? null,
-        posizione: r.posizione,
+        posizione: isBracketPhase(r.fase_torneo_codice)
+          ? finalPositionByPhase.get(r.fase_torneo_codice) ?? null
+          : r.posizione,
+        tabellone_turno: isBracketPhase(r.fase_torneo_codice)
+          ? formatBracketSlot(bracketSlotByPhase.get(r.fase_torneo_codice) ?? null)
+          : null,
+        squadra_nome: r.squadra_nome ?? team?.nome ?? '',
         partite_giocate: r.partite_giocate,
         partite_vinte: r.partite_vinte,
         partite_pareggiate: Math.max(0, r.partite_giocate - r.partite_vinte - r.partite_perse),
@@ -107,8 +196,69 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
         punti_classifica: r.punti_classifica
       }));
 
+      bracketSlotByPhase.forEach((slot, phaseCode) => {
+        if (formatted.some((row) => row.fase_torneo_codice === phaseCode)) return;
+        formatted.push({
+          fase_torneo_codice: phaseCode,
+          fase_nome: phaseCode === 'GOLD' ? 'Gold' : 'Silver',
+          girone_codice: null,
+          girone_nome: null,
+          posizione: finalPositionByPhase.get(phaseCode) ?? null,
+          tabellone_turno: formatBracketSlot(slot),
+          squadra_nome: team?.nome ?? '',
+          partite_giocate: 0,
+          partite_vinte: 0,
+          partite_pareggiate: 0,
+          partite_perse: 0,
+          set_vinti: 0,
+          set_persi: 0,
+          punti_fatti: 0,
+          punti_subiti: 0,
+          differenza_punti: 0,
+          punti_classifica: 0
+        });
+      });
+
       setStats(formatted);
       setSetBreakdown(((breakdownRes.data ?? []) as SetBreakdownRow[]).filter((row) => row.set_vinti + row.set_persi > 0));
+      const matchTeams = new Map<number, { team1: string; team2: string }>();
+      matchTeamsRes.data?.forEach((match) => {
+        matchTeams.set(match.partita_id, {
+          team1: match.squadra_1_codice,
+          team2: match.squadra_2_codice
+        });
+      });
+
+      const nextSetDetailsByMatchTeam: Record<string, SetDetailRow[]> = {};
+      setDetailsRes.data?.forEach((set) => {
+        const matchTeamsRow = matchTeams.get(set.partita_id);
+        if (!matchTeamsRow) return;
+
+        const details = [
+          {
+            teamCode: matchTeamsRow.team1,
+            punti_fatti: set.punteggio_squadra_1,
+            punti_subiti: set.punteggio_squadra_2
+          },
+          {
+            teamCode: matchTeamsRow.team2,
+            punti_fatti: set.punteggio_squadra_2,
+            punti_subiti: set.punteggio_squadra_1
+          }
+        ];
+
+        details.forEach((detail) => {
+          const key = `${set.partita_id}-${detail.teamCode}`;
+          if (!nextSetDetailsByMatchTeam[key]) nextSetDetailsByMatchTeam[key] = [];
+          nextSetDetailsByMatchTeam[key].push({
+            numero_set: set.numero_set,
+            vinto: set.squadra_vincitrice_codice === detail.teamCode,
+            punti_fatti: detail.punti_fatti,
+            punti_subiti: detail.punti_subiti
+          });
+        });
+      });
+      setSetDetailsByMatchTeam(nextSetDetailsByMatchTeam);
       setLoading(false);
     }
 
@@ -165,6 +315,8 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
                   <col className="team-stats-col-phase" />
                   <col className="team-stats-col-group" />
                   <col className="standings-col-pos" />
+                  <col className="standings-col-team" />
+                  <col className="standings-col-points" />
                   <col className="standings-col-small" />
                   <col className="standings-col-small" />
                   <col className="standings-col-small" />
@@ -173,37 +325,56 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
                   <col className="standings-col-score-points" />
                   <col className="standings-col-score-points" />
                   <col className="standings-col-score-points" />
-                  <col className="standings-col-points" />
                 </colgroup>
 
                 <thead>
                   <tr>
                     <th>Fase</th>
-                    <th>Girone</th>
+                    <th>Dettaglio</th>
                     <th>Pos</th>
+                    <th>Squadra</th>
+                    <th>Punti</th>
                     <th>PG</th>
-                    <th>V</th>
-                    <th>N</th>
-                    <th>P</th>
+                    <th>Vinte</th>
+                    <th>Pari</th>
+                    <th>Perse</th>
                     <th>Set V/P</th>
                     <th>PF</th>
                     <th>PS</th>
                     <th>Diff</th>
-                    <th>Punti</th>
                   </tr>
                 </thead>
 
                 <tbody>
                   {stats.map((row, idx) => {
                     const qualificationTier = getQualificationTier(row.posizione, row.girone_codice);
+                    const hasSetDetails = row.set_vinti + row.set_persi > 0;
+                    const isBracket = isBracketPhase(row.fase_torneo_codice);
 
                     return (
-                      <tr key={idx} className={qualificationTier ? `standings-row-${qualificationTier}` : undefined}>
+                      <tr
+                        key={idx}
+                        className={[
+                          qualificationTier ? `standings-row-${qualificationTier}` : '',
+                          hasSetDetails ? 'standings-clickable-row' : ''
+                        ].filter(Boolean).join(' ') || undefined}
+                        tabIndex={hasSetDetails ? 0 : undefined}
+                        role={hasSetDetails ? 'button' : undefined}
+                        aria-label={hasSetDetails ? `Apri scontri di ${row.squadra_nome} in ${row.fase_nome}` : undefined}
+                        onClick={hasSetDetails ? () => setSelectedSetStat(row) : undefined}
+                        onKeyDown={(event) => {
+                          if (!hasSetDetails) return;
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            setSelectedSetStat(row);
+                          }
+                        }}
+                      >
                         <td>{row.fase_nome}</td>
-                        <td>{row.girone_nome ?? '-'}</td>
+                        <td>{isBracket ? row.tabellone_turno ?? '-' : row.girone_nome ?? '-'}</td>
                         <td>
                           <span className="team-stats-position">
-                            {row.posizione}
+                            {row.posizione ?? '-'}
                             {qualificationTier && (
                               <span className={`standings-qualification standings-qualification-${qualificationTier}`}>
                                 {qualificationTier === 'gold' ? 'Gold' : 'Silver'}
@@ -211,17 +382,22 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
                             )}
                           </span>
                         </td>
+                        <td>
+                          <div className="standings-team-cell">
+                            <span className="standings-team-name">{row.squadra_nome}</span>
+                          </div>
+                        </td>
+                        <td>{isBracket ? '-' : row.punti_classifica}</td>
                         <td>{row.partite_giocate}</td>
                         <td>{row.partite_vinte}</td>
                         <td>{row.partite_pareggiate}</td>
                         <td>{row.partite_perse}</td>
                         <td>
-                          {row.set_vinti} / {row.set_persi}
+                          <span className="standings-set-value">{row.set_vinti} / {row.set_persi}</span>
                         </td>
                         <td>{row.punti_fatti}</td>
                         <td>{row.punti_subiti}</td>
                         <td>{row.differenza_punti}</td>
-                        <td>{row.girone_codice ? row.punti_classifica : '-'}</td>
                       </tr>
                     );
                   })}
@@ -233,24 +409,48 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
           <div className="team-stats-mobile-list">
             {stats.map((row, idx) => {
               const qualificationTier = getQualificationTier(row.posizione, row.girone_codice);
+              const hasSetDetails = row.set_vinti + row.set_persi > 0;
+              const isBracket = isBracketPhase(row.fase_torneo_codice);
 
               return (
                 <article
                   key={`${row.fase_nome}-${row.girone_nome ?? 'fase'}-${idx}`}
-                  className={qualificationTier ? `team-stats-card standings-row-${qualificationTier}` : 'team-stats-card'}
+                  className={[
+                    'team-stats-card',
+                    qualificationTier ? `standings-row-${qualificationTier}` : '',
+                    hasSetDetails ? 'team-stats-card-clickable' : ''
+                  ].filter(Boolean).join(' ')}
+                  tabIndex={hasSetDetails ? 0 : undefined}
+                  role={hasSetDetails ? 'button' : undefined}
+                  aria-label={hasSetDetails ? `Apri scontri di ${row.squadra_nome} in ${row.fase_nome}` : undefined}
+                  onClick={hasSetDetails ? () => setSelectedSetStat(row) : undefined}
+                  onKeyDown={(event) => {
+                    if (!hasSetDetails) return;
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      setSelectedSetStat(row);
+                    }
+                  }}
                 >
                   <div className="team-stats-card-heading">
-                    <span>{row.fase_nome}</span>
-                    {row.girone_nome && <strong>{row.girone_nome}</strong>}
-                    {qualificationTier && (
-                      <small className={`standings-qualification standings-qualification-${qualificationTier}`}>
-                        {qualificationTier === 'gold' ? 'Gold' : 'Silver'}
-                      </small>
-                    )}
+                    <div className="team-stats-card-title">
+                      <span>{row.fase_nome}</span>
+                      {!isBracket && row.girone_nome && <strong>{row.girone_nome}</strong>}
+                      {qualificationTier && (
+                        <small className={`standings-qualification standings-qualification-${qualificationTier}`}>
+                          {qualificationTier === 'gold' ? 'Gold' : 'Silver'}
+                        </small>
+                      )}
+                    </div>
                   </div>
 
                   <div className="team-stats-card-summary">
-                    {row.girone_codice && (
+                    {isBracket ? (
+                      <div className="team-stats-card-points">
+                        <span>Turno tabellone</span>
+                        <strong>{row.tabellone_turno ?? '-'}</strong>
+                      </div>
+                    ) : (
                       <div className="team-stats-card-points">
                         <span>Punti classifica</span>
                         <strong>{row.punti_classifica}</strong>
@@ -259,55 +459,53 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
 
                     <div className="team-stats-card-position">
                       <small>Posizione</small>
-                      <span>{row.posizione}</span>
+                      <span>{row.posizione ?? '-'}</span>
                     </div>
                   </div>
 
                   <div className="team-stats-card-grid">
                     <div className="team-stats-stat-card">
-                      <span>PG</span>
+                      <span>Giocate</span>
                       <strong>{row.partite_giocate}</strong>
                     </div>
 
                     <div className="team-stats-stat-card">
-                      <span>V</span>
+                      <span>Vinte</span>
                       <strong>{row.partite_vinte}</strong>
                     </div>
 
                     <div className="team-stats-stat-card">
-                      <span>N</span>
+                      <span>Pareggiate</span>
                       <strong>{row.partite_pareggiate}</strong>
                     </div>
 
                     <div className="team-stats-stat-card">
-                      <span>P</span>
+                      <span>Perse</span>
                       <strong>{row.partite_perse}</strong>
                     </div>
 
-                    <button
-                      className="team-stats-stat-card team-stats-set-card"
-                      type="button"
-                      disabled={row.set_vinti + row.set_persi === 0}
-                      onClick={() => setSelectedSetStat(row)}
-                    >
-                      <span>Set</span>
-                      <strong>
-                        {row.set_vinti} / {row.set_persi}
-                      </strong>
-                    </button>
+                    <div className="team-stats-stat-card">
+                      <span>Set vinti</span>
+                      <strong>{row.set_vinti}</strong>
+                    </div>
 
                     <div className="team-stats-stat-card">
-                      <span>PF</span>
+                      <span>Set persi</span>
+                      <strong>{row.set_persi}</strong>
+                    </div>
+
+                    <div className="team-stats-stat-card">
+                      <span>Punti fatti</span>
                       <strong>{row.punti_fatti}</strong>
                     </div>
 
                     <div className="team-stats-stat-card">
-                      <span>PS</span>
+                      <span>Punti subiti</span>
                       <strong>{row.punti_subiti}</strong>
                     </div>
 
                     <div className="team-stats-stat-card">
-                      <span>Diff</span>
+                      <span>Differenza punti</span>
                       <strong>{row.differenza_punti}</strong>
                     </div>
                   </div>
@@ -328,7 +526,7 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
                 >
                   <div className="standings-set-modal-heading">
                     <div>
-                      <span>Set V/P</span>
+                      <span>Scontri</span>
                       <h3 id="team-set-detail-title">
                         {selectedSetStat.fase_nome}
                         {selectedSetStat.girone_nome ? ` - ${selectedSetStat.girone_nome}` : ''}
@@ -343,29 +541,39 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
                   {selectedSetRows.length === 0 ? (
                     <p className="standings-set-empty">Nessun set giocato in questa fase.</p>
                   ) : (
-                    <div className="standings-set-list">
-                      {selectedSetRows.map((match) => (
-                        <article key={match.partita_id} className="standings-set-card">
-                          <div>
-                            <span>Avversaria</span>
-                            <strong>{match.avversaria_nome}</strong>
-                          </div>
+                    <div className="standings-set-list standings-set-list-scroll">
+                      {selectedSetRows.map((match) => {
+                        const setDetails = setDetailsByMatchTeam[`${match.partita_id}-${match.squadra_codice}`] ?? [];
+                        const outcome = getMatchOutcome(match);
+                        return (
+                          <article key={match.partita_id} className={`standings-set-card ${outcome.className}`}>
+                            <div className="standings-set-card-matchup">
+                              <span>Scontro diretto</span>
+                              <strong>{team?.nome ?? selectedSetStat.squadra_nome}</strong>
+                              <small>contro {match.avversaria_nome}</small>
+                            </div>
 
-                          <div className="standings-set-card-score">
-                            <span>Set</span>
-                            <strong>
-                              {match.set_vinti} / {match.set_persi}
-                            </strong>
-                          </div>
+                            <div className="standings-set-card-summary">
+                              <span className="standings-set-outcome">{outcome.label}</span>
+                              <strong>
+                                {match.set_vinti} set vinti, {match.set_persi} persi
+                              </strong>
+                              <small>{match.punti_fatti} punti fatti, {match.punti_subiti} subiti</small>
+                            </div>
 
-                          <div className="standings-set-card-points">
-                            <span>Punti</span>
-                            <strong>
-                              {match.punti_fatti} / {match.punti_subiti}
-                            </strong>
-                          </div>
-                        </article>
-                      ))}
+                            <div className="standings-set-chip-list" aria-label="Dettaglio set">
+                              {setDetails.map((setDetail) => (
+                                <span
+                                  key={setDetail.numero_set}
+                                  className={`standings-set-chip ${setDetail.vinto ? 'standings-set-chip-won' : 'standings-set-chip-lost'}`}
+                                >
+                                  Set {setDetail.numero_set}: {setDetail.vinto ? 'vinto' : 'perso'} {setDetail.punti_fatti}-{setDetail.punti_subiti}
+                                </span>
+                              ))}
+                            </div>
+                          </article>
+                        );
+                      })}
                     </div>
                   )}
                 </section>

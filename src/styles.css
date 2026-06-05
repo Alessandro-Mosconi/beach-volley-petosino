@@ -457,17 +457,13 @@ button:disabled {
 }
 
 .mobile-nav-auth .auth-popover {
-  position: fixed;
-  top: max(1rem, env(safe-area-inset-top));
-  left: 1rem;
-  right: 1rem;
-  z-index: 120;
-  width: auto;
-  max-height: calc(100dvh - 2rem);
+  position: static;
+  width: 100%;
+  max-height: calc(100dvh - 160px);
   overflow-y: auto;
-  margin: 0 auto;
+  margin-top: 0.35rem;
   border-color: var(--card-border);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
+  box-shadow: none;
 }
 
 .section-panel {
@@ -2592,6 +2588,8 @@ ul li {
   }
 
   .courts-mobile-slot {
+    min-width: 0;
+    max-width: 100%;
     border: 1px solid var(--card-border);
     border-radius: 14px;
     padding: 0.85rem;
@@ -2604,11 +2602,13 @@ ul li {
 
   .courts-mobile-cards {
     display: grid;
+    min-width: 0;
     gap: 0.7rem;
   }
 
   .courts-mobile-court {
     display: grid;
+    min-width: 0;
     gap: 0.45rem;
   }
 
@@ -2619,6 +2619,30 @@ ul li {
   .court-match-card,
   .court-match-empty,
   .court-lunch-card {
+    min-width: 0;
+    max-width: 100%;
     min-height: auto;
+  }
+
+  .court-match-topline {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .court-match-outcome {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .court-match-teams span,
+  .court-match-details span,
+  .court-lunch-list span {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .court-card-actions {
+    grid-template-columns: 1fr;
   }
 }

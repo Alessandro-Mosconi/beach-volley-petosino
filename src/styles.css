@@ -391,7 +391,7 @@ button:disabled {
   display: grid;
   gap: 0.35rem;
   width: min(280px, calc(100vw - 2rem));
-  max-height: min(520px, 55dvh);
+  max-height: min(680px, calc(100dvh - 92px));
   overflow-y: auto;
   overscroll-behavior: contain;
   border: 1px solid var(--surface-border);

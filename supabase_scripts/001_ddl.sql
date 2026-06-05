@@ -642,6 +642,10 @@ select
     ps.squadra_codice,
     count(*) filter (where ps.risultato_squadra in ('VINTA', 'PERSA') or ps.set_vinti + ps.set_persi > 0)::integer as partite_giocate,
     coalesce(sum(ps.partita_vinta), 0)::integer as partite_vinte,
+    count(*) filter (
+        where ps.set_vinti + ps.set_persi > 0
+          and ps.risultato_squadra not in ('VINTA', 'PERSA')
+    )::integer as partite_pareggiate,
     coalesce(sum(ps.partita_persa), 0)::integer as partite_perse,
     coalesce(sum(ps.set_vinti), 0)::integer as set_vinti,
     coalesce(sum(ps.set_persi), 0)::integer as set_persi,
@@ -687,6 +691,7 @@ with classifica_con_scontro_diretto as (
         c.squadra_codice,
         c.partite_giocate,
         c.partite_vinte,
+        c.partite_pareggiate,
         c.partite_perse,
         c.set_vinti,
         c.set_persi,
@@ -703,6 +708,7 @@ select
     c.squadra_codice,
     c.partite_giocate,
     c.partite_vinte,
+    c.partite_pareggiate,
     c.partite_perse,
     c.set_vinti,
     c.set_persi,

@@ -4,6 +4,7 @@
 -- - punti classifica = set vinti nei gironi
 -- - 1-1 assegna quindi 1 punto a entrambe le squadre
 -- - partite giocate conteggiate anche quando non c'e vincitore partita
+-- - partite pareggiate = match giocati senza vittoria o sconfitta partita
 -- - spareggi: punti, scontro diretto, differenza punti, punti fatti
 -- =====================================================
 
@@ -25,7 +26,11 @@ select
     case
         when ps.fase_torneo_codice = 'GIRONI' then coalesce(sum(ps.set_vinti), 0)::integer
         else (coalesce(sum(ps.partita_vinta), 0) * 3)::integer
-    end as punti_classifica
+    end as punti_classifica,
+    count(*) filter (
+        where ps.set_vinti + ps.set_persi > 0
+          and ps.risultato_squadra not in ('VINTA', 'PERSA')
+    )::integer as partite_pareggiate
 from v_partita_squadra ps
 where ps.risultato_squadra in ('VINTA', 'PERSA')
    or ps.set_vinti + ps.set_persi > 0
@@ -67,7 +72,8 @@ with classifica_con_scontro_diretto as (
         c.punti_subiti,
         c.differenza_set,
         c.differenza_punti,
-        c.punti_classifica
+        c.punti_classifica,
+        c.partite_pareggiate
 )
 select
     c.torneo_id,
@@ -95,7 +101,8 @@ select
     )::integer as posizione,
     s.nome as squadra_nome,
     g.nome as girone_nome,
-    f.nome as fase_nome
+    f.nome as fase_nome,
+    c.partite_pareggiate
 from classifica_con_scontro_diretto c
 join squadra s on s.codice = c.squadra_codice
 left join girone g on g.codice = c.girone_codice

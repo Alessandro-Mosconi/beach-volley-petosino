@@ -23,11 +23,13 @@ interface StatRow {
   posizione: number;
   partite_giocate: number;
   partite_vinte: number;
+  partite_pareggiate: number;
   partite_perse: number;
   set_vinti: number;
   set_persi: number;
   punti_fatti: number;
   punti_subiti: number;
+  differenza_punti: number;
   punti_classifica: number;
 }
 
@@ -65,7 +67,7 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
         supabase
           .from('v_classifica_ordinata')
           .select(
-            'fase_torneo_codice, fase_nome, girone_codice, girone_nome, posizione, partite_giocate, partite_vinte, partite_perse, set_vinti, set_persi, punti_fatti, punti_subiti, punti_classifica'
+            'fase_torneo_codice, fase_nome, girone_codice, girone_nome, posizione, partite_giocate, partite_vinte, partite_perse, set_vinti, set_persi, punti_fatti, punti_subiti, differenza_punti, punti_classifica'
           )
           .eq('torneo_id', tournamentId)
           .eq('squadra_codice', teamId)
@@ -95,11 +97,13 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
         posizione: r.posizione,
         partite_giocate: r.partite_giocate,
         partite_vinte: r.partite_vinte,
+        partite_pareggiate: Math.max(0, r.partite_giocate - r.partite_vinte - r.partite_perse),
         partite_perse: r.partite_perse,
         set_vinti: r.set_vinti,
         set_persi: r.set_persi,
         punti_fatti: r.punti_fatti,
         punti_subiti: r.punti_subiti,
+        differenza_punti: r.differenza_punti,
         punti_classifica: r.punti_classifica
       }));
 
@@ -164,7 +168,9 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
                   <col className="standings-col-small" />
                   <col className="standings-col-small" />
                   <col className="standings-col-small" />
+                  <col className="standings-col-small" />
                   <col className="standings-col-sets" />
+                  <col className="standings-col-score-points" />
                   <col className="standings-col-score-points" />
                   <col className="standings-col-score-points" />
                   <col className="standings-col-points" />
@@ -177,10 +183,12 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
                     <th>Pos</th>
                     <th>PG</th>
                     <th>V</th>
+                    <th>N</th>
                     <th>P</th>
                     <th>Set V/P</th>
                     <th>PF</th>
                     <th>PS</th>
+                    <th>Diff</th>
                     <th>Punti</th>
                   </tr>
                 </thead>
@@ -205,12 +213,14 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
                         </td>
                         <td>{row.partite_giocate}</td>
                         <td>{row.partite_vinte}</td>
+                        <td>{row.partite_pareggiate}</td>
                         <td>{row.partite_perse}</td>
                         <td>
                           {row.set_vinti} / {row.set_persi}
                         </td>
                         <td>{row.punti_fatti}</td>
                         <td>{row.punti_subiti}</td>
+                        <td>{row.differenza_punti}</td>
                         <td>{row.girone_codice ? row.punti_classifica : '-'}</td>
                       </tr>
                     );
@@ -265,6 +275,11 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
                     </div>
 
                     <div className="team-stats-stat-card">
+                      <span>N</span>
+                      <strong>{row.partite_pareggiate}</strong>
+                    </div>
+
+                    <div className="team-stats-stat-card">
                       <span>P</span>
                       <strong>{row.partite_perse}</strong>
                     </div>
@@ -289,6 +304,11 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
                     <div className="team-stats-stat-card">
                       <span>PS</span>
                       <strong>{row.punti_subiti}</strong>
+                    </div>
+
+                    <div className="team-stats-stat-card">
+                      <span>Diff</span>
+                      <strong>{row.differenza_punti}</strong>
                     </div>
                   </div>
                 </article>

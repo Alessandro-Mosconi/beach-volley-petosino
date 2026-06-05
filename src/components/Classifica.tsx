@@ -13,11 +13,13 @@ interface TeamRow {
   squadra_nome: string;
   partite_giocate: number;
   partite_vinte: number;
+  partite_pareggiate: number;
   partite_perse: number;
   set_vinti: number;
   set_persi: number;
   punti_fatti: number;
   punti_subiti: number;
+  differenza_punti: number;
   punti_classifica: number;
   girone_codice: string;
   girone_nome: string;
@@ -102,11 +104,13 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
           squadra_nome: r.squadra_nome ?? '',
           partite_giocate: r.partite_giocate,
           partite_vinte: r.partite_vinte,
+          partite_pareggiate: Math.max(0, r.partite_giocate - r.partite_vinte - r.partite_perse),
           partite_perse: r.partite_perse,
           set_vinti: r.set_vinti,
           set_persi: r.set_persi,
           punti_fatti: r.punti_fatti,
           punti_subiti: r.punti_subiti,
+          differenza_punti: r.differenza_punti,
           punti_classifica: r.punti_classifica,
           girone_codice: r.girone_codice,
           girone_nome: r.girone_nome ?? ''
@@ -126,11 +130,13 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
           squadra_nome: squadraMap.get(p.squadra_codice) ?? '',
           partite_giocate: 0,
           partite_vinte: 0,
+          partite_pareggiate: 0,
           partite_perse: 0,
           set_vinti: 0,
           set_persi: 0,
           punti_fatti: 0,
           punti_subiti: 0,
+          differenza_punti: 0,
           punti_classifica: 0,
           girone_codice: p.girone_codice,
           girone_nome: gironeMap.get(p.girone_codice) ?? ''
@@ -159,9 +165,7 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
         }
 
         if (a.punti_classifica !== b.punti_classifica) return b.punti_classifica - a.punti_classifica;
-        const pointsDiffA = a.punti_fatti - a.punti_subiti;
-        const pointsDiffB = b.punti_fatti - b.punti_subiti;
-        if (pointsDiffA !== pointsDiffB) return pointsDiffB - pointsDiffA;
+        if (a.differenza_punti !== b.differenza_punti) return b.differenza_punti - a.differenza_punti;
 
         return a.squadra_nome.localeCompare(b.squadra_nome, 'it');
       });
@@ -246,7 +250,9 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
                   <col className="standings-col-small" />
                   <col className="standings-col-small" />
                   <col className="standings-col-small" />
+                  <col className="standings-col-small" />
                   <col className="standings-col-sets" />
+                  <col className="standings-col-score-points" />
                   <col className="standings-col-score-points" />
                   <col className="standings-col-score-points" />
                 </colgroup>
@@ -257,10 +263,12 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
                     <th>Punti</th>
                     <th>PG</th>
                     <th>Vinte</th>
+                    <th>Pari</th>
                     <th>Perse</th>
                     <th>Set V/P</th>
                     <th>PF</th>
                     <th>PS</th>
+                    <th>Diff</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -285,6 +293,7 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
                         <td>{row.punti_classifica}</td>
                         <td>{row.partite_giocate}</td>
                         <td>{row.partite_vinte}</td>
+                        <td>{row.partite_pareggiate}</td>
                         <td>{row.partite_perse}</td>
                         <td>
                           <button
@@ -298,6 +307,7 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
                         </td>
                         <td>{row.punti_fatti}</td>
                         <td>{row.punti_subiti}</td>
+                        <td>{row.differenza_punti}</td>
                       </tr>
                     );
                   })}

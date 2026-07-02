@@ -6,25 +6,136 @@
 -- Nessuna classifica manuale: le classifiche sono calcolate dalle view.
 -- =====================================================
 
-truncate table partita_set, qualificazione_fase, partita, girone_squadra, squadra, girone, campo, fase_torneo, torneo restart identity cascade;
+truncate table partita_set, qualificazione_fase, partita, girone_squadra, squadra, girone, campo, torneo_fase, fase_torneo, torneo_regolamento, torneo restart identity cascade;
 
 insert into torneo (nome, data_torneo, visibile) values ('Torneo Beach Volley Petosino 2026', '2026-06-07', true);
 
-insert into campo (codice, torneo_id, nome, ordine) values
-    ('CAMPO_1', 1, 'Campo A', 1),
-    ('CAMPO_2', 1, 'Campo B', 2),
-    ('CAMPO_3', 1, 'Campo C', 3);
+insert into campo (torneo_id, codice, nome, ordine) values
+    (1, 'CAMPO_1', 'Campo A', 1),
+    (1, 'CAMPO_2', 'Campo B', 2),
+    (1, 'CAMPO_3', 'Campo C', 3);
 
-insert into fase_torneo (codice, nome, descrizione, ordine) values
-    ('GIRONI', 'Gironi', 'Fase iniziale a gironi', 1),
-    ('GOLD', 'Gold', 'Tabellone Gold', 2),
-    ('SILVER', 'Silver', 'Tabellone Silver', 3);
+insert into fase_torneo (codice, nome, descrizione, tipo, ordine) values
+    ('GIRONI', 'Gironi', 'Fase iniziale a gironi', 'GIRONE', 1),
+    ('GOLD', 'Gold', 'Tabellone Gold', 'ELIMINAZIONE_DIRETTA', 2),
+    ('SILVER', 'Silver', 'Tabellone Silver', 'ELIMINAZIONE_DIRETTA', 3);
 
-insert into girone (codice, torneo_id, nome, ordine) values
-    ('GIRONE_A', 1, 'A', 1),
-    ('GIRONE_B', 1, 'B', 2),
-    ('GIRONE_C', 1, 'C', 3),
-    ('GIRONE_D', 1, 'D', 4);
+insert into torneo_fase (torneo_id, fase_torneo_codice, ordine) values
+    (1, 'GIRONI', 1),
+    (1, 'GOLD', 2),
+    (1, 'SILVER', 3);
+
+insert into torneo_regolamento (torneo_id, contenuto) values
+    (1, '{
+      "title": "Regolamento",
+      "sections": [
+        {
+          "eyebrow": "Fase iniziale",
+          "title": "Gironi",
+          "variant": "primary",
+          "listType": "ul",
+          "items": [
+            "Il torneo prevede 4 gironi da 5 squadre.",
+            "Le partite dei gironi si giocano su 2 set al 15.",
+            "Non e previsto tie-break nella fase a gironi.",
+            "Ogni set vinto vale 1 punto in classifica.",
+            "Una partita finita 1-1 assegna quindi 1 punto a entrambe le squadre.",
+            "Le prime 2 squadre di ogni girone accedono al tabellone Gold.",
+            "La 3a e la 4a squadra di ogni girone accedono al tabellone Silver."
+          ]
+        },
+        {
+          "eyebrow": "Classifica",
+          "title": "Criteri di ordinamento",
+          "listType": "ol",
+          "items": [
+            "Punti classifica",
+            "Scontro diretto tra squadre a pari punti",
+            "Differenza punti fatti/subiti"
+          ]
+        },
+        {
+          "eyebrow": "Tabellone",
+          "title": "Gold",
+          "variant": "gold",
+          "listType": "ul",
+          "items": [
+            "Tabellone a eliminazione diretta con quarti, semifinali, finale e finalina 3/4 posto.",
+            "Quarti e semifinali: 2 set al 21 con eventuale tie-break al 15.",
+            "Finale e finalina: 2 set al 25 con eventuale tie-break al 15."
+          ]
+        },
+        {
+          "eyebrow": "Tabellone",
+          "title": "Silver",
+          "variant": "silver",
+          "listType": "ul",
+          "items": [
+            "Tabellone a eliminazione diretta con quarti, semifinali, finale e finalina 3/4 posto.",
+            "Quarti e semifinali: 1 set al 21.",
+            "Finale: 2 set al 21 con eventuale tie-break al 15.",
+            "Finalina: 1 set al 25."
+          ]
+        },
+        {
+          "eyebrow": "Orari",
+          "title": "Prima della partita",
+          "listType": "ul",
+          "items": [
+            "Presentarsi nella zona dei campi qualche minuto prima dell''orario previsto.",
+            "Non iniziare la partita prima dell''orario previsto."
+          ]
+        },
+        {
+          "eyebrow": "Arbitraggio",
+          "title": "Auto-arbitraggio",
+          "listType": "ul",
+          "items": [
+            "La fase a gironi si svolge in auto-arbitraggio: ogni squadra arbitrera una o due partite di altre squadre.",
+            "Prima della partita da arbitrare va ritirato all''INFO POINT il foglio per l''arbitraggio.",
+            "Il foglio va riconsegnato all''INFO POINT a partita finita.",
+            "Le fasi finali saranno arbitrate dagli organizzatori del torneo."
+          ]
+        },
+        {
+          "eyebrow": "Gironi",
+          "title": "Regole di arbitraggio",
+          "listType": "ul",
+          "items": [
+            "Fischiare tassativamente invasioni, tetto e linea pestata in battuta.",
+            "Fischiare le accompagnate solo se troppo evidenti; in linea di massima lasciare correre dove si puo.",
+            "Non fischiare doppie, pallonetti e palleggi in nessuna situazione."
+          ]
+        },
+        {
+          "eyebrow": "Servizi",
+          "title": "Pranzo e ghiacciolo",
+          "listType": "ul",
+          "items": [
+            "All''orario assegnato per il pranzo, recarsi alla cucina e consegnare il biglietto del pranzo.",
+            "La bevanda si ritira alla postazione dedicata consegnando il biglietto della bevanda.",
+            "La cucina apre alle 12:00 ed e possibile acquistare piatti extra ordinando al momento.",
+            "Ogni squadra avra almeno 45 minuti a disposizione per pranzare.",
+            "Il ghiacciolo si ritira al bar in qualsiasi momento consegnando il biglietto del ghiacciolo."
+          ]
+        },
+        {
+          "eyebrow": "Servizi",
+          "title": "Spogliatoi",
+          "listType": "ul",
+          "items": [
+            "Gli spogliatoi saranno disponibili tutto il giorno.",
+            "Per evitare sprechi, fare la doccia solo dopo aver terminato tutte le proprie partite."
+          ]
+        }
+      ]
+    }'::jsonb);
+
+insert into girone (torneo_id, codice, nome, ordine) values
+    (1, 'GIRONE_A', 'A', 1),
+    (1, 'GIRONE_B', 'B', 2),
+    (1, 'GIRONE_C', 'C', 3),
+    (1, 'GIRONE_D', 'D', 4);
 
 insert into squadra (torneo_id, nome, orario_pranzo) values
     (1, 'Beach-Erini', '12:45:00'),
@@ -48,27 +159,27 @@ insert into squadra (torneo_id, nome, orario_pranzo) values
     (1, 'I Quater Salti In Padela', '13:10:00'),
     (1, 'Costretti Ma Volenterosi', '12:00:00');
 
-insert into girone_squadra (girone_codice, squadra_codice) values
-    ('GIRONE_A', 'BEACH_ERINI'),
-    ('GIRONE_B', 'VOLTAREN'),
-    ('GIRONE_C', 'VOLLEY_UN_DLINK'),
-    ('GIRONE_D', 'POPZ'),
-    ('GIRONE_A', 'BARBONE'),
-    ('GIRONE_B', 'TETTE_BISCOTTATE'),
-    ('GIRONE_C', '4_PALLE_6_BOCCE'),
-    ('GIRONE_D', 'I_VINTAGE'),
-    ('GIRONE_A', 'GLI_IMPROVVISATI'),
-    ('GIRONE_B', 'BECCACCINI'),
-    ('GIRONE_C', 'PAOLA_S_BABIES'),
-    ('GIRONE_D', 'GLI_INSABBIATI'),
-    ('GIRONE_A', 'I_CHEZ'),
-    ('GIRONE_B', 'UN_NOME_A_CASO'),
-    ('GIRONE_C', 'NEW_TEAM'),
-    ('GIRONE_D', 'I_LIMONI_SUL_GARDA'),
-    ('GIRONE_A', 'ALMENO_CI_ABBIAMO_PROVATO'),
-    ('GIRONE_B', 'I_MINI_MISTER'),
-    ('GIRONE_C', 'I_QUATER_SALTI_IN_PADELA'),
-    ('GIRONE_D', 'COSTRETTI_MA_VOLENTEROSI');
+insert into girone_squadra (torneo_id, girone_codice, squadra_codice) values
+    (1, 'GIRONE_A', 'BEACH_ERINI'),
+    (1, 'GIRONE_B', 'VOLTAREN'),
+    (1, 'GIRONE_C', 'VOLLEY_UN_DLINK'),
+    (1, 'GIRONE_D', 'POPZ'),
+    (1, 'GIRONE_A', 'BARBONE'),
+    (1, 'GIRONE_B', 'TETTE_BISCOTTATE'),
+    (1, 'GIRONE_C', '4_PALLE_6_BOCCE'),
+    (1, 'GIRONE_D', 'I_VINTAGE'),
+    (1, 'GIRONE_A', 'GLI_IMPROVVISATI'),
+    (1, 'GIRONE_B', 'BECCACCINI'),
+    (1, 'GIRONE_C', 'PAOLA_S_BABIES'),
+    (1, 'GIRONE_D', 'GLI_INSABBIATI'),
+    (1, 'GIRONE_A', 'I_CHEZ'),
+    (1, 'GIRONE_B', 'UN_NOME_A_CASO'),
+    (1, 'GIRONE_C', 'NEW_TEAM'),
+    (1, 'GIRONE_D', 'I_LIMONI_SUL_GARDA'),
+    (1, 'GIRONE_A', 'ALMENO_CI_ABBIAMO_PROVATO'),
+    (1, 'GIRONE_B', 'I_MINI_MISTER'),
+    (1, 'GIRONE_C', 'I_QUATER_SALTI_IN_PADELA'),
+    (1, 'GIRONE_D', 'COSTRETTI_MA_VOLENTEROSI');
 
 insert into partita (torneo_id, fase_torneo_codice, girone_codice, campo_codice, orario_inizio, squadra_1_codice, squadra_2_codice, squadra_arbitro_codice, stato, note) values
     (1, 'GIRONI', 'GIRONE_A', 'CAMPO_1', '2026-06-07 09:00:00+02', 'BARBONE', 'ALMENO_CI_ABBIAMO_PROVATO', 'BECCACCINI', 'programmata', null),

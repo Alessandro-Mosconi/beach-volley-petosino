@@ -32,6 +32,7 @@ drop view if exists v_classifica_ordinata cascade;
 drop view if exists v_classifica cascade;
 drop view if exists v_partita_squadra cascade;
 drop view if exists v_partita_risultato cascade;
+drop view if exists v_torneo_fase cascade;
 
 
 drop function if exists ricalcola_risultato_partita(integer) cascade;
@@ -42,6 +43,7 @@ drop function if exists puo_modificare_risultati() cascade;
 drop function if exists puo_modificare_risultati_partita(integer) cascade;
 drop function if exists puo_modificare_risultati_set(integer) cascade;
 drop function if exists trg_squadra_codice_default_fn() cascade;
+drop function if exists trg_torneo_regolamento_updated_at_fn() cascade;
 drop function if exists trg_torneo_visibile_unico_fn() cascade;
 drop function if exists normalizza_codice(text) cascade;
 
@@ -53,8 +55,10 @@ drop table if exists torneo_operatore cascade;
 drop table if exists girone_squadra cascade;
 drop table if exists squadra cascade;
 drop table if exists girone cascade;
+drop table if exists torneo_fase cascade;
 drop table if exists fase_torneo cascade;
 drop table if exists campo cascade;
+drop table if exists torneo_regolamento cascade;
 drop table if exists torneo cascade;
 
 -- =====================================================
@@ -114,6 +118,33 @@ for each row
 execute function trg_torneo_visibile_unico_fn();
 
 -- =====================================================
+-- REGOLAMENTO TORNEO
+-- JSON flessibile per sezioni, liste e testi specifici del torneo.
+-- =====================================================
+
+create table torneo_regolamento (
+    torneo_id integer primary key references torneo(id) on delete cascade,
+    contenuto jsonb not null,
+    aggiornato_il timestamp with time zone not null default now(),
+    constraint chk_torneo_regolamento_contenuto_object check (jsonb_typeof(contenuto) = 'object')
+);
+
+create or replace function trg_torneo_regolamento_updated_at_fn()
+returns trigger
+language plpgsql
+as $$
+begin
+    new.aggiornato_il := now();
+    return new;
+end;
+$$;
+
+create trigger trg_torneo_regolamento_updated_at
+before update on torneo_regolamento
+for each row
+execute function trg_torneo_regolamento_updated_at_fn();
+
+-- =====================================================
 -- OPERATORI AUTORIZZATI
 -- Whitelist globale: gli utenti Supabase Auth presenti qui possono
 -- inserire/modificare partite, set e punteggi dall'app.
@@ -155,10 +186,11 @@ $$;
 -- =====================================================
 
 create table campo (
-    codice text primary key,
     torneo_id integer not null references torneo(id) on delete cascade,
+    codice text not null,
     nome text not null,
     ordine integer not null default 0,
+    primary key (torneo_id, codice),
     unique (torneo_id, nome)
 );
 
@@ -171,8 +203,32 @@ create table fase_torneo (
     codice text primary key,
     nome text not null,
     descrizione text,
-    ordine integer not null default 0
+    tipo text not null default 'ELIMINAZIONE_DIRETTA',
+    ordine integer not null default 0,
+    constraint chk_fase_torneo_tipo check (tipo in ('GIRONE', 'ELIMINAZIONE_DIRETTA', 'ALTRO'))
 );
+
+create table torneo_fase (
+    torneo_id integer not null references torneo(id) on delete cascade,
+    fase_torneo_codice text not null references fase_torneo(codice) on delete cascade,
+    ordine integer not null default 0,
+    nome_override text,
+    visibile boolean not null default true,
+    primary key (torneo_id, fase_torneo_codice)
+);
+
+create or replace view v_torneo_fase as
+select
+    tf.torneo_id,
+    ft.codice,
+    coalesce(tf.nome_override, ft.nome) as nome,
+    ft.descrizione,
+    ft.tipo,
+    coalesce(nullif(tf.ordine, 0), ft.ordine) as ordine,
+    tf.visibile
+from torneo_fase tf
+join fase_torneo ft on ft.codice = tf.fase_torneo_codice
+where tf.visibile = true;
 
 -- =====================================================
 -- GIRONE
@@ -180,10 +236,11 @@ create table fase_torneo (
 -- =====================================================
 
 create table girone (
-    codice text primary key,
     torneo_id integer not null references torneo(id) on delete cascade,
+    codice text not null,
     nome text not null,
     ordine integer not null default 0,
+    primary key (torneo_id, codice),
     unique (torneo_id, nome)
 );
 
@@ -194,12 +251,13 @@ create table girone (
 -- =====================================================
 
 create table squadra (
-    codice text primary key,
     torneo_id integer not null references torneo(id) on delete cascade,
+    codice text not null,
     nome text not null,
     orario_pranzo time,
     durata_pranzo_minuti integer not null default 60,
     creato_il timestamp with time zone not null default now(),
+    primary key (torneo_id, codice),
     unique (torneo_id, nome),
     check (durata_pranzo_minuti > 0)
 );
@@ -236,9 +294,12 @@ execute function trg_squadra_codice_default_fn();
 
 create table girone_squadra (
     id integer generated always as identity primary key,
-    girone_codice text not null references girone(codice) on delete cascade,
-    squadra_codice text not null references squadra(codice) on delete cascade,
-    unique (girone_codice, squadra_codice)
+    torneo_id integer not null references torneo(id) on delete cascade,
+    girone_codice text not null,
+    squadra_codice text not null,
+    unique (torneo_id, girone_codice, squadra_codice),
+    foreign key (torneo_id, girone_codice) references girone(torneo_id, codice) on delete cascade,
+    foreign key (torneo_id, squadra_codice) references squadra(torneo_id, codice) on delete cascade
 );
 
 -- =====================================================
@@ -255,17 +316,25 @@ create table partita (
     id integer generated always as identity primary key,
     torneo_id integer not null references torneo(id) on delete cascade,
     fase_torneo_codice text not null references fase_torneo(codice),
-    girone_codice text references girone(codice) on delete set null,
+    girone_codice text,
     slot_tabellone text,
-    campo_codice text not null references campo(codice),
+    campo_codice text not null,
     orario_inizio timestamp with time zone not null,
-    squadra_1_codice text not null references squadra(codice),
-    squadra_2_codice text not null references squadra(codice),
-    squadra_arbitro_codice text references squadra(codice),
-    squadra_vincitrice_codice text references squadra(codice),
-    squadra_perdente_codice text references squadra(codice),
+    squadra_1_codice text not null,
+    squadra_2_codice text not null,
+    squadra_arbitro_codice text,
+    squadra_vincitrice_codice text,
+    squadra_perdente_codice text,
     stato text default 'programmata',
     note text,
+
+    foreign key (torneo_id, girone_codice) references girone(torneo_id, codice) on delete set null,
+    foreign key (torneo_id, campo_codice) references campo(torneo_id, codice),
+    foreign key (torneo_id, squadra_1_codice) references squadra(torneo_id, codice),
+    foreign key (torneo_id, squadra_2_codice) references squadra(torneo_id, codice),
+    foreign key (torneo_id, squadra_arbitro_codice) references squadra(torneo_id, codice),
+    foreign key (torneo_id, squadra_vincitrice_codice) references squadra(torneo_id, codice),
+    foreign key (torneo_id, squadra_perdente_codice) references squadra(torneo_id, codice),
 
     constraint chk_partita_squadre_diverse
         check (squadra_1_codice <> squadra_2_codice),
@@ -273,7 +342,7 @@ create table partita (
     constraint chk_partita_slot_tabellone_fase
         check (
             slot_tabellone is null
-            or fase_torneo_codice in ('GOLD', 'SILVER')
+            or fase_torneo_codice in ('GOLD', 'SILVER', 'TORNEO')
         ),
 
     constraint chk_partita_slot_tabellone_valido
@@ -371,10 +440,13 @@ execute function trg_partita_validate_vincitore_fn();
 create table partita_set (
     id integer generated always as identity primary key,
     partita_id integer not null references partita(id) on delete cascade,
+    torneo_id integer not null references torneo(id) on delete cascade,
     numero_set integer not null,
     punteggio_squadra_1 integer not null default 0,
     punteggio_squadra_2 integer not null default 0,
-    squadra_vincitrice_codice text references squadra(codice),
+    squadra_vincitrice_codice text,
+
+    foreign key (torneo_id, squadra_vincitrice_codice) references squadra(torneo_id, codice),
 
     unique (partita_id, numero_set),
     check (numero_set > 0),
@@ -389,17 +461,20 @@ returns trigger
 language plpgsql
 as $$
 declare
+    v_torneo_id integer;
     v_squadra_1 text;
     v_squadra_2 text;
 begin
-    select squadra_1_codice, squadra_2_codice
-    into v_squadra_1, v_squadra_2
+    select torneo_id, squadra_1_codice, squadra_2_codice
+    into v_torneo_id, v_squadra_1, v_squadra_2
     from partita
     where id = new.partita_id;
 
     if v_squadra_1 is null then
         raise exception 'Partita % non trovata', new.partita_id;
     end if;
+
+    new.torneo_id := v_torneo_id;
 
     if new.punteggio_squadra_1 > new.punteggio_squadra_2 then
         new.squadra_vincitrice_codice := v_squadra_1;
@@ -501,13 +576,15 @@ execute function trg_partita_set_ricalcola_partita_fn();
 
 create table qualificazione_fase (
     id integer generated always as identity primary key,
+    torneo_id integer not null references torneo(id) on delete cascade,
     fase_torneo_codice text not null references fase_torneo(codice) on delete cascade,
-    squadra_codice text not null references squadra(codice) on delete cascade,
+    squadra_codice text not null,
 
     -- Solo questo serve:
     -- indica che una squadra partecipa alla fase GOLD o SILVER.
     -- Girone di origine e posizione si calcolano dalle view di classifica.
-    unique (fase_torneo_codice, squadra_codice)
+    unique (torneo_id, fase_torneo_codice, squadra_codice),
+    foreign key (torneo_id, squadra_codice) references squadra(torneo_id, codice) on delete cascade
 );
 
 -- =====================================================
@@ -551,12 +628,12 @@ select
     ) as risultato_set
 
 from partita p
-join campo c on c.codice = p.campo_codice
-join squadra s1 on s1.codice = p.squadra_1_codice
-join squadra s2 on s2.codice = p.squadra_2_codice
-left join squadra sa on sa.codice = p.squadra_arbitro_codice
-left join squadra sv on sv.codice = p.squadra_vincitrice_codice
-left join squadra sp on sp.codice = p.squadra_perdente_codice
+join campo c on c.torneo_id = p.torneo_id and c.codice = p.campo_codice
+join squadra s1 on s1.torneo_id = p.torneo_id and s1.codice = p.squadra_1_codice
+join squadra s2 on s2.torneo_id = p.torneo_id and s2.codice = p.squadra_2_codice
+left join squadra sa on sa.torneo_id = p.torneo_id and sa.codice = p.squadra_arbitro_codice
+left join squadra sv on sv.torneo_id = p.torneo_id and sv.codice = p.squadra_vincitrice_codice
+left join squadra sp on sp.torneo_id = p.torneo_id and sp.codice = p.squadra_perdente_codice
 left join partita_set ps on ps.partita_id = p.id
 group by
     p.id, p.torneo_id, p.fase_torneo_codice, p.girone_codice, p.slot_tabellone, p.campo_codice,
@@ -730,8 +807,8 @@ select
     g.nome as girone_nome,
     f.nome as fase_nome
 from classifica_con_scontro_diretto c
-join squadra s on s.codice = c.squadra_codice
-left join girone g on g.codice = c.girone_codice
+join squadra s on s.torneo_id = c.torneo_id and s.codice = c.squadra_codice
+left join girone g on g.torneo_id = c.torneo_id and g.codice = c.girone_codice
 left join fase_torneo f on f.codice = c.fase_torneo_codice;
 
 -- =====================================================
@@ -791,7 +868,7 @@ create or replace view v_classifica_finale as
 with partite_finali as (
     select *
     from v_partita_risultato
-    where fase_torneo_codice in ('GOLD', 'SILVER')
+    where fase_torneo_codice in ('GOLD', 'SILVER', 'TORNEO')
       and slot_tabellone in ('FINALE', 'FINALINA')
       and squadra_vincitrice_codice is not null
       and squadra_perdente_codice is not null
@@ -917,10 +994,10 @@ select
     p.stato,
     p.note
 from partita p
-join campo c on c.codice = p.campo_codice
-join squadra s1 on s1.codice = p.squadra_1_codice
-join squadra s2 on s2.codice = p.squadra_2_codice
-left join squadra sa on sa.codice = p.squadra_arbitro_codice
+join campo c on c.torneo_id = p.torneo_id and c.codice = p.campo_codice
+join squadra s1 on s1.torneo_id = p.torneo_id and s1.codice = p.squadra_1_codice
+join squadra s2 on s2.torneo_id = p.torneo_id and s2.codice = p.squadra_2_codice
+left join squadra sa on sa.torneo_id = p.torneo_id and sa.codice = p.squadra_arbitro_codice
 
 union all
 
@@ -946,10 +1023,10 @@ select
     p.stato,
     p.note
 from partita p
-join campo c on c.codice = p.campo_codice
-join squadra s1 on s1.codice = p.squadra_1_codice
-join squadra s2 on s2.codice = p.squadra_2_codice
-left join squadra sa on sa.codice = p.squadra_arbitro_codice
+join campo c on c.torneo_id = p.torneo_id and c.codice = p.campo_codice
+join squadra s1 on s1.torneo_id = p.torneo_id and s1.codice = p.squadra_1_codice
+join squadra s2 on s2.torneo_id = p.torneo_id and s2.codice = p.squadra_2_codice
+left join squadra sa on sa.torneo_id = p.torneo_id and sa.codice = p.squadra_arbitro_codice
 
 -- =====================================================
 -- PARTITE ARBITRATE
@@ -979,10 +1056,10 @@ select
     p.stato,
     p.note
 from partita p
-join campo c on c.codice = p.campo_codice
-join squadra s1 on s1.codice = p.squadra_1_codice
-join squadra s2 on s2.codice = p.squadra_2_codice
-join squadra sa on sa.codice = p.squadra_arbitro_codice
+join campo c on c.torneo_id = p.torneo_id and c.codice = p.campo_codice
+join squadra s1 on s1.torneo_id = p.torneo_id and s1.codice = p.squadra_1_codice
+join squadra s2 on s2.torneo_id = p.torneo_id and s2.codice = p.squadra_2_codice
+join squadra sa on sa.torneo_id = p.torneo_id and sa.codice = p.squadra_arbitro_codice
 where p.squadra_arbitro_codice is not null
 
 -- =====================================================
@@ -1022,8 +1099,10 @@ where s.orario_pranzo is not null;
 -- =====================================================
 
 alter table torneo enable row level security;
+alter table torneo_regolamento enable row level security;
 alter table campo enable row level security;
 alter table fase_torneo enable row level security;
+alter table torneo_fase enable row level security;
 alter table girone enable row level security;
 alter table squadra enable row level security;
 alter table girone_squadra enable row level security;
@@ -1033,8 +1112,10 @@ alter table partita_set enable row level security;
 alter table qualificazione_fase enable row level security;
 
 create policy public_read_torneo on torneo for select to anon, authenticated using (true);
+create policy public_read_torneo_regolamento on torneo_regolamento for select to anon, authenticated using (true);
 create policy public_read_campo on campo for select to anon, authenticated using (true);
 create policy public_read_fase_torneo on fase_torneo for select to anon, authenticated using (true);
+create policy public_read_torneo_fase on torneo_fase for select to anon, authenticated using (true);
 create policy public_read_girone on girone for select to anon, authenticated using (true);
 create policy public_read_squadra on squadra for select to anon, authenticated using (true);
 create policy public_read_girone_squadra on girone_squadra for select to anon, authenticated using (true);
@@ -1064,11 +1145,22 @@ with check (puo_modificare_risultati());
 create policy operator_delete_partita_set on partita_set for delete to authenticated
 using (puo_modificare_risultati());
 
+create policy operator_insert_torneo_regolamento on torneo_regolamento for insert to authenticated
+with check (puo_modificare_risultati());
+
+create policy operator_update_torneo_regolamento on torneo_regolamento for update to authenticated
+using (puo_modificare_risultati())
+with check (puo_modificare_risultati());
+
+create policy operator_delete_torneo_regolamento on torneo_regolamento for delete to authenticated
+using (puo_modificare_risultati());
+
 grant usage on schema public to anon, authenticated;
 grant select on all tables in schema public to anon, authenticated;
-grant insert, update, delete on partita, partita_set to authenticated;
+grant insert, update, delete on partita, partita_set, torneo_regolamento to authenticated;
 grant usage, select on sequence partita_id_seq, partita_set_id_seq to authenticated;
 grant select on
+    v_torneo_fase,
     v_partita_risultato,
     v_partita_squadra,
     v_classifica,
@@ -1092,8 +1184,10 @@ to anon, authenticated;
 -- =====================================================
 
 do $$ begin alter publication supabase_realtime add table torneo; exception when duplicate_object then null; end $$;
+do $$ begin alter publication supabase_realtime add table torneo_regolamento; exception when duplicate_object then null; end $$;
 do $$ begin alter publication supabase_realtime add table campo; exception when duplicate_object then null; end $$;
 do $$ begin alter publication supabase_realtime add table fase_torneo; exception when duplicate_object then null; end $$;
+do $$ begin alter publication supabase_realtime add table torneo_fase; exception when duplicate_object then null; end $$;
 do $$ begin alter publication supabase_realtime add table girone; exception when duplicate_object then null; end $$;
 do $$ begin alter publication supabase_realtime add table squadra; exception when duplicate_object then null; end $$;
 do $$ begin alter publication supabase_realtime add table girone_squadra; exception when duplicate_object then null; end $$;

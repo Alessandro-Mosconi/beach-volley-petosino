@@ -57,6 +57,12 @@ interface SetDetailRow {
   punti_subiti: number;
 }
 
+interface PhaseOption {
+  codice: string;
+  nome: string;
+  tipo: string;
+}
+
 function getQualificationTier(position: number | null, gironeCodice: string | null) {
   if (position === null || !gironeCodice) return null;
   if (position <= 2) return 'gold';
@@ -70,8 +76,8 @@ function getMatchOutcome(match: SetBreakdownRow) {
   return { label: 'Perso', className: 'standings-set-card-lost' };
 }
 
-function isBracketPhase(phaseCode: string) {
-  return phaseCode === 'GOLD' || phaseCode === 'SILVER';
+function isBracketPhase(phaseCode: string, bracketPhaseCodes: Set<string>) {
+  return bracketPhaseCodes.has(phaseCode);
 }
 
 function getBracketSlotRank(slot: string | null) {
@@ -95,6 +101,7 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
   const [stats, setStats] = useState<StatRow[]>([]);
   const [setBreakdown, setSetBreakdown] = useState<SetBreakdownRow[]>([]);
   const [setDetailsByMatchTeam, setSetDetailsByMatchTeam] = useState<Record<string, SetDetailRow[]>>({});
+  const [phases, setPhases] = useState<PhaseOption[]>([]);
   const [selectedSetStat, setSelectedSetStat] = useState<StatRow | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const team = teams.find((t) => t.codice === teamId);
@@ -103,7 +110,7 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
     async function fetchStats() {
       setLoading(true);
 
-      const [statsRes, breakdownRes, finalRankingRes] = await Promise.all([
+      const [statsRes, breakdownRes, finalRankingRes, phasesRes] = await Promise.all([
         supabase
           .from('v_classifica_ordinata')
           .select(
@@ -124,16 +131,28 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
           .from('v_classifica_finale')
           .select('fase_torneo_codice, posizione')
           .eq('torneo_id', tournamentId)
-          .eq('squadra_codice', teamId)
+          .eq('squadra_codice', teamId),
+        supabase
+          .from('v_torneo_fase')
+          .select('codice, nome, tipo')
+          .eq('torneo_id', tournamentId)
       ]);
 
-      if (statsRes.error || !statsRes.data || breakdownRes.error || finalRankingRes.error) {
+      if (statsRes.error || !statsRes.data || breakdownRes.error || finalRankingRes.error || phasesRes.error) {
         setStats([]);
         setSetBreakdown([]);
         setSetDetailsByMatchTeam({});
         setLoading(false);
         return;
       }
+
+      const nextPhases = (phasesRes.data ?? []) as PhaseOption[];
+      const bracketPhaseCodes = new Set(
+        nextPhases
+          .filter((phase) => phase.tipo === 'ELIMINAZIONE_DIRETTA')
+          .map((phase) => phase.codice)
+      );
+      const phaseNameByCode = new Map(nextPhases.map((phase) => [phase.codice, phase.nome]));
 
       const matchIds = Array.from(new Set((breakdownRes.data ?? []).map((match) => match.partita_id)));
       const [matchTeamsRes, setDetailsRes] = matchIds.length > 0
@@ -165,7 +184,7 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
 
       const bracketSlotByPhase = new Map<string, string>();
       (breakdownRes.data ?? []).forEach((match) => {
-        if (!isBracketPhase(match.fase_torneo_codice)) return;
+        if (!isBracketPhase(match.fase_torneo_codice, bracketPhaseCodes)) return;
         const currentSlot = bracketSlotByPhase.get(match.fase_torneo_codice) ?? null;
         if (getBracketSlotRank(match.slot_tabellone) > getBracketSlotRank(currentSlot)) {
           bracketSlotByPhase.set(match.fase_torneo_codice, match.slot_tabellone ?? '');
@@ -174,13 +193,13 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
 
       const formatted: StatRow[] = statsRes.data.map((r) => ({
         fase_torneo_codice: r.fase_torneo_codice,
-        fase_nome: r.fase_nome ?? '',
+        fase_nome: r.fase_nome ?? phaseNameByCode.get(r.fase_torneo_codice) ?? r.fase_torneo_codice,
         girone_codice: r.girone_codice ?? null,
         girone_nome: r.girone_nome ?? null,
-        posizione: isBracketPhase(r.fase_torneo_codice)
+        posizione: isBracketPhase(r.fase_torneo_codice, bracketPhaseCodes)
           ? finalPositionByPhase.get(r.fase_torneo_codice) ?? null
           : r.posizione,
-        tabellone_turno: isBracketPhase(r.fase_torneo_codice)
+        tabellone_turno: isBracketPhase(r.fase_torneo_codice, bracketPhaseCodes)
           ? formatBracketSlot(bracketSlotByPhase.get(r.fase_torneo_codice) ?? null)
           : null,
         squadra_nome: r.squadra_nome ?? team?.nome ?? '',
@@ -200,7 +219,7 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
         if (formatted.some((row) => row.fase_torneo_codice === phaseCode)) return;
         formatted.push({
           fase_torneo_codice: phaseCode,
-          fase_nome: phaseCode === 'GOLD' ? 'Gold' : 'Silver',
+          fase_nome: phaseNameByCode.get(phaseCode) ?? phaseCode,
           girone_codice: null,
           girone_nome: null,
           posizione: finalPositionByPhase.get(phaseCode) ?? null,
@@ -219,6 +238,7 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
         });
       });
 
+      setPhases(nextPhases);
       setStats(formatted);
       setSetBreakdown(((breakdownRes.data ?? []) as SetBreakdownRow[]).filter((row) => row.set_vinti + row.set_persi > 0));
       const matchTeams = new Map<number, { team1: string; team2: string }>();
@@ -270,6 +290,7 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
       .on('postgres_changes', { event: '*', schema: 'public', table: 'partita_set' }, () => fetchStats())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'girone' }, () => fetchStats())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'fase_torneo' }, () => fetchStats())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'torneo_fase' }, () => fetchStats())
       .subscribe();
 
     return () => {
@@ -284,6 +305,9 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
           (row.girone_codice ?? '') === (selectedSetStat.girone_codice ?? '')
       )
     : [];
+  const bracketPhaseCodes = new Set(
+    phases.filter((phase) => phase.tipo === 'ELIMINAZIONE_DIRETTA').map((phase) => phase.codice)
+  );
 
   return (
     <div className="team-stats-view">
@@ -349,7 +373,7 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
                   {stats.map((row, idx) => {
                     const qualificationTier = getQualificationTier(row.posizione, row.girone_codice);
                     const hasSetDetails = row.set_vinti + row.set_persi > 0;
-                    const isBracket = isBracketPhase(row.fase_torneo_codice);
+                    const isBracket = isBracketPhase(row.fase_torneo_codice, bracketPhaseCodes);
 
                     return (
                       <tr
@@ -410,7 +434,7 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
             {stats.map((row, idx) => {
               const qualificationTier = getQualificationTier(row.posizione, row.girone_codice);
               const hasSetDetails = row.set_vinti + row.set_persi > 0;
-              const isBracket = isBracketPhase(row.fase_torneo_codice);
+              const isBracket = isBracketPhase(row.fase_torneo_codice, bracketPhaseCodes);
 
               return (
                 <article

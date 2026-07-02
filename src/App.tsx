@@ -25,27 +25,28 @@ type View =
   | 'agenda'
   | 'partite'
   | 'classifica'
-  | 'gold'
-  | 'silver'
-  | 'gold_ranking'
-  | 'silver_ranking'
   | 'stats'
   | 'regolamento'
-  | 'info_service';
+  | 'info_service'
+  | `phase:${string}`
+  | `ranking:${string}`;
 type Theme = 'dark' | 'light';
+
+type PhaseKind = 'GIRONE' | 'ELIMINAZIONE_DIRETTA' | 'ALTRO';
+
+interface TournamentPhase {
+  codice: string;
+  nome: string;
+  tipo: PhaseKind;
+  ordine: number;
+}
+
+interface NavItem {
+  view: View;
+  label: string;
+}
+
 const SELECTED_TEAM_STORAGE_KEY = 'beach-volley:selectedTeam';
-const NAV_ITEMS: Array<{ view: View; label: string; rankingPhase?: 'GOLD' | 'SILVER' }> = [
-  { view: 'agenda', label: 'Agenda' },
-  { view: 'partite', label: 'Partite' },
-  { view: 'classifica', label: 'Classifiche Gironi' },
-  { view: 'gold', label: 'Gold' },
-  { view: 'gold_ranking', label: 'Classifica Gold', rankingPhase: 'GOLD' },
-  { view: 'silver', label: 'Silver' },
-  { view: 'silver_ranking', label: 'Classifica Silver', rankingPhase: 'SILVER' },
-  { view: 'stats', label: 'Statistiche Squadra' },
-  { view: 'regolamento', label: 'Regolamento' },
-  { view: 'info_service', label: 'Info Service' }
-];
 
 function AuthPanel({
   session,
@@ -192,6 +193,13 @@ function ThemeToggle({ theme, onToggle }: { theme: Theme; onToggle: () => void }
 }
 
 function viewFromPath(pathname: string): View {
+  if (pathname.startsWith('/fase/')) {
+    return phaseView(decodeURIComponent(pathname.replace('/fase/', '')));
+  }
+  if (pathname.startsWith('/classifica-fase/')) {
+    return rankingView(decodeURIComponent(pathname.replace('/classifica-fase/', '')));
+  }
+
   switch (pathname) {
     case '/':
     case '/agenda':
@@ -200,14 +208,18 @@ function viewFromPath(pathname: string): View {
       return 'classifica';
     case '/partite':
       return 'partite';
+    case '/torneo':
+      return phaseView('TORNEO');
+    case '/classifica-torneo':
+      return rankingView('TORNEO');
     case '/gold':
-      return 'gold';
+      return phaseView('GOLD');
     case '/classifica-gold':
-      return 'gold_ranking';
+      return rankingView('GOLD');
     case '/silver':
-      return 'silver';
+      return phaseView('SILVER');
     case '/classifica-silver':
-      return 'silver_ranking';
+      return rankingView('SILVER');
     case '/stats':
       return 'stats';
     case '/regolamento':
@@ -220,6 +232,21 @@ function viewFromPath(pathname: string): View {
 }
 
 function pathFromView(view: View): string {
+  if (view.startsWith('phase:')) {
+    const phaseCode = phaseCodeFromView(view);
+    if (phaseCode === 'TORNEO') return '/torneo';
+    if (phaseCode === 'GOLD') return '/gold';
+    if (phaseCode === 'SILVER') return '/silver';
+    return `/fase/${encodeURIComponent(phaseCode ?? '')}`;
+  }
+  if (view.startsWith('ranking:')) {
+    const phaseCode = rankingPhaseFromView(view);
+    if (phaseCode === 'TORNEO') return '/classifica-torneo';
+    if (phaseCode === 'GOLD') return '/classifica-gold';
+    if (phaseCode === 'SILVER') return '/classifica-silver';
+    return `/classifica-fase/${encodeURIComponent(phaseCode ?? '')}`;
+  }
+
   switch (view) {
     case 'agenda':
       return '/';
@@ -227,14 +254,6 @@ function pathFromView(view: View): string {
       return '/classifica';
     case 'partite':
       return '/partite';
-    case 'gold':
-      return '/gold';
-    case 'gold_ranking':
-      return '/classifica-gold';
-    case 'silver':
-      return '/silver';
-    case 'silver_ranking':
-      return '/classifica-silver';
     case 'stats':
       return '/stats';
     case 'regolamento':
@@ -246,9 +265,30 @@ function pathFromView(view: View): string {
   }
 }
 
+function phaseView(phaseCode: string): View {
+  return `phase:${phaseCode}`;
+}
+
+function rankingView(phaseCode: string): View {
+  return `ranking:${phaseCode}`;
+}
+
+function phaseCodeFromView(view: View) {
+  return view.startsWith('phase:') ? view.replace('phase:', '') : null;
+}
+
+function rankingPhaseFromView(view: View) {
+  return view.startsWith('ranking:') ? view.replace('ranking:', '') : null;
+}
+
+function visiblePhaseFromView(view: View) {
+  return phaseCodeFromView(view) ?? rankingPhaseFromView(view);
+}
+
 export default function App() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [activeTournament, setActiveTournament] = useState<Tournament | null>(null);
+  const [tournamentPhases, setTournamentPhases] = useState<TournamentPhase[]>([]);
   const [selectedTeam, setSelectedTeam] = useState<string | null>(() =>
     window.localStorage.getItem(SELECTED_TEAM_STORAGE_KEY)
   );
@@ -258,10 +298,7 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [canEditResults, setCanEditResults] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
-  const [finalRankingReady, setFinalRankingReady] = useState<Record<'GOLD' | 'SILVER', boolean>>({
-    GOLD: false,
-    SILVER: false
-  });
+  const [finalRankingReady, setFinalRankingReady] = useState<Record<string, boolean>>({});
   const [theme, setTheme] = useState<Theme>(() => {
     const storedTheme = window.localStorage.getItem('theme');
     return storedTheme === 'dark' ? 'dark' : 'light';
@@ -341,8 +378,12 @@ export default function App() {
 
   useEffect(() => {
     async function fetchFinalRankingReadiness() {
-      if (!activeTournament) {
-        setFinalRankingReady({ GOLD: false, SILVER: false });
+      const rankingPhaseCodes = tournamentPhases
+        .filter((phase) => phase.tipo === 'ELIMINAZIONE_DIRETTA')
+        .map((phase) => phase.codice);
+
+      if (!activeTournament || rankingPhaseCodes.length === 0) {
+        setFinalRankingReady({});
         return;
       }
 
@@ -350,15 +391,15 @@ export default function App() {
         .from('v_partita_risultato')
         .select('fase_torneo_codice, slot_tabellone, squadra_vincitrice_codice, squadra_perdente_codice')
         .eq('torneo_id', activeTournament.id)
-        .in('fase_torneo_codice', ['GOLD', 'SILVER'])
+        .in('fase_torneo_codice', rankingPhaseCodes)
         .in('slot_tabellone', ['FINALE', 'FINALINA']);
 
       if (error || !data) {
-        setFinalRankingReady({ GOLD: false, SILVER: false });
+        setFinalRankingReady({});
         return;
       }
 
-      const isReady = (phase: 'GOLD' | 'SILVER') => {
+      const isReady = (phase: string) => {
         const phaseMatches = data.filter((match) => match.fase_torneo_codice === phase);
         return ['FINALE', 'FINALINA'].every((slot) =>
           phaseMatches.some(
@@ -370,10 +411,9 @@ export default function App() {
         );
       };
 
-      setFinalRankingReady({
-        GOLD: isReady('GOLD'),
-        SILVER: isReady('SILVER')
-      });
+      setFinalRankingReady(
+        Object.fromEntries(rankingPhaseCodes.map((phaseCode) => [phaseCode, isReady(phaseCode)]))
+      );
     }
 
     fetchFinalRankingReadiness();
@@ -387,22 +427,34 @@ export default function App() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [activeTournament]);
+  }, [activeTournament, tournamentPhases]);
 
   useEffect(() => {
-    if (view === 'gold_ranking' && !finalRankingReady.GOLD) {
-      goToView('gold');
-    }
-    if (view === 'silver_ranking' && !finalRankingReady.SILVER) {
-      goToView('silver');
-    }
-  }, [finalRankingReady, view]);
+    const phaseCode = visiblePhaseFromView(view);
+    if (!phaseCode) return;
 
-  const visibleNavItems = NAV_ITEMS.filter((item) => {
-    if (item.view === 'info_service' && !session) return false;
-    if (item.rankingPhase && !finalRankingReady[item.rankingPhase]) return false;
-    return true;
-  });
+    const phaseExists = tournamentPhases.some((phase) => phase.codice === phaseCode);
+    const firstEliminationPhase = tournamentPhases.find((phase) => phase.tipo === 'ELIMINAZIONE_DIRETTA');
+
+    if (!phaseExists && firstEliminationPhase) {
+      goToView(phaseView(firstEliminationPhase.codice));
+    }
+  }, [tournamentPhases, view]);
+
+  const groupPhase = tournamentPhases.find((phase) => phase.tipo === 'GIRONE');
+  const directEliminationPhases = tournamentPhases.filter((phase) => phase.tipo === 'ELIMINAZIONE_DIRETTA');
+  const visibleNavItems: NavItem[] = [
+    { view: 'agenda', label: 'Agenda' },
+    { view: 'partite', label: 'Partite' },
+    ...(groupPhase ? [{ view: 'classifica' as View, label: groupPhase.nome }] : []),
+    ...directEliminationPhases.map((phase) => ({ view: phaseView(phase.codice), label: phase.nome })),
+    ...directEliminationPhases
+      .filter((phase) => finalRankingReady[phase.codice])
+      .map((phase) => ({ view: rankingView(phase.codice), label: `Classifica ${phase.nome}` })),
+    { view: 'stats', label: 'Statistiche Squadra' },
+    { view: 'regolamento', label: 'Regolamento' },
+    ...(session ? [{ view: 'info_service' as View, label: 'Info Service' }] : [])
+  ];
 
   useEffect(() => {
     async function fetchTournamentAndTeams() {
@@ -414,6 +466,7 @@ export default function App() {
 
       if (tournamentError || !tournament) {
         setActiveTournament(null);
+        setTournamentPhases([]);
         setTeams([]);
         setTeamsLoadError(tournamentError ? 'Errore nel caricamento del torneo attivo' : null);
         setLoading(false);
@@ -422,16 +475,35 @@ export default function App() {
 
       setActiveTournament(tournament as Tournament);
 
-      const { data: teamsData, error } = await supabase
-        .from('squadra')
-        .select('codice, nome, orario_pranzo')
-        .eq('torneo_id', tournament.id)
-        .order('nome', { ascending: true });
+      const [teamsResult, phasesResult] = await Promise.all([
+        supabase
+          .from('squadra')
+          .select('codice, nome, orario_pranzo')
+          .eq('torneo_id', tournament.id)
+          .order('nome', { ascending: true }),
+        supabase
+          .from('v_torneo_fase')
+          .select('codice, nome, tipo, ordine')
+          .eq('torneo_id', tournament.id)
+          .order('ordine', { ascending: true })
+      ]);
+
+      const { data: teamsData, error } = teamsResult;
+      const { data: phasesData, error: phasesError } = phasesResult;
+
+      if (!phasesError && phasesData) {
+        setTournamentPhases(phasesData as TournamentPhase[]);
+      } else {
+        setTournamentPhases([]);
+        setTeamsLoadError(phasesError?.message ?? 'Errore nel caricamento delle fasi torneo');
+      }
 
       if (!error && teamsData) {
         const nextTeams = teamsData as Team[];
         setTeams(nextTeams);
-        setTeamsLoadError(null);
+        if (!phasesError) {
+          setTeamsLoadError(null);
+        }
         setSelectedTeam((currentSelected) => {
           if (nextTeams.length === 0) return null;
           if (currentSelected && nextTeams.some((team) => team.codice === currentSelected)) {
@@ -458,6 +530,11 @@ export default function App() {
         { event: '*', schema: 'public', table: 'squadra' },
         () => fetchTournamentAndTeams()
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'torneo_fase' },
+        () => fetchTournamentAndTeams()
+      )
       .subscribe();
 
     return () => {
@@ -478,6 +555,9 @@ export default function App() {
       </div>
     );
   }
+
+  const currentBracketPhase = phaseCodeFromView(view);
+  const currentRankingPhase = rankingPhaseFromView(view);
 
   return (
     <div className="app-shell">
@@ -565,10 +645,10 @@ export default function App() {
         )}
         {view === 'classifica' && <Classifica faseName="GIRONI" tournamentId={activeTournament.id} />}
         {view === 'partite' && <MatchesByCourt tournamentId={activeTournament.id} canEdit={canEditResults} />}
-        {view === 'gold' && <Bracket faseName="GOLD" tournamentId={activeTournament.id} />}
-        {view === 'gold_ranking' && <FinalRanking faseName="GOLD" tournamentId={activeTournament.id} />}
-        {view === 'silver' && <Bracket faseName="SILVER" tournamentId={activeTournament.id} />}
-        {view === 'silver_ranking' && <FinalRanking faseName="SILVER" tournamentId={activeTournament.id} />}
+        {currentBracketPhase && (
+          <Bracket faseName={currentBracketPhase} tournamentId={activeTournament.id} canEdit={canEditResults} />
+        )}
+        {currentRankingPhase && <FinalRanking faseName={currentRankingPhase} tournamentId={activeTournament.id} />}
         {view === 'stats' && selectedTeam && (
           <TeamStats
             teamId={selectedTeam}
@@ -577,7 +657,7 @@ export default function App() {
             onTeamChange={setSelectedTeam}
           />
         )}
-        {view === 'regolamento' && <Regolamento />}
+        {view === 'regolamento' && <Regolamento tournamentId={activeTournament.id} canEdit={canEditResults} />}
         {view === 'info_service' && <InfoService />}
       </div>
     </div>

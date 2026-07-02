@@ -83,7 +83,7 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
       }
 
       const [participantsRes, squadreRes, gironiRes, setBreakdownRes] = await Promise.all([
-        supabase.from('girone_squadra').select('girone_codice, squadra_codice'),
+        supabase.from('girone_squadra').select('girone_codice, squadra_codice').eq('torneo_id', tournamentId),
         supabase.from('squadra').select('codice, nome').eq('torneo_id', tournamentId),
         supabase.from('girone').select('codice, nome').eq('torneo_id', tournamentId),
         supabase

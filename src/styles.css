@@ -245,6 +245,7 @@ body {
 
 select,
 input,
+textarea,
 button {
   border-radius: var(--control-radius);
   border: 1px solid var(--input-border);
@@ -399,6 +400,14 @@ button:disabled {
   padding: 0.45rem;
   background: var(--surface-bg);
   box-shadow: 0 14px 34px var(--surface-shadow);
+}
+
+textarea {
+  width: 100%;
+  min-height: 360px;
+  resize: vertical;
+  font-family: var(--mono-font);
+  line-height: 1.45;
 }
 
 .mobile-nav-links {
@@ -870,6 +879,10 @@ ul li {
   background-size: 28px 28px;
 }
 
+.bracket-graph--edit {
+  height: 840px;
+}
+
 .bracket-graph-lines {
   position: absolute;
   inset: 0;
@@ -896,7 +909,7 @@ ul li {
 .bracket-graph-node {
   position: absolute;
   width: 224px;
-  height: 144px;
+  min-height: 144px;
   border: 1px solid var(--card-border);
   border-radius: 12px;
   padding: 0.56rem;
@@ -926,6 +939,32 @@ ul li {
   border-radius: 10px;
   padding: 0.7rem;
   background: var(--card-bg);
+}
+
+.bracket-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.4rem;
+  margin-top: auto;
+  padding-top: 0.55rem;
+}
+
+.bracket-actions button {
+  width: 100%;
+  border-color: var(--agenda-player);
+  background: var(--agenda-player-soft);
+  color: var(--heading-color);
+  padding: 0.42rem 0.48rem;
+  font-size: 0.76rem;
+  font-weight: 850;
+}
+
+.bracket-actions button:first-child:last-child {
+  grid-column: 1 / -1;
+}
+
+.bracket-editor {
+  width: min(680px, 100%);
 }
 
 .bracket-match-heading {
@@ -1577,6 +1616,38 @@ ul li {
   margin-bottom: 0;
 }
 
+.rules-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.rules-edit-button {
+  flex: 0 0 auto;
+  border-color: var(--agenda-player);
+  background: var(--agenda-player-soft);
+  color: var(--heading-color);
+  font-weight: 800;
+}
+
+.rules-add-btn {
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border-radius: 999px;
+  border-color: var(--agenda-player);
+  background: var(--agenda-player-soft);
+  color: var(--heading-color);
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .rules-grid,
 .rules-brackets {
   display: grid;
@@ -1585,11 +1656,34 @@ ul li {
 }
 
 .rules-card {
+  position: relative;
   border: 1px solid var(--card-border);
   border-radius: 22px;
   padding: 1rem;
   background: var(--card-bg);
   box-shadow: 0 16px 42px rgba(3, 9, 23, 0.12);
+}
+
+.rules-card-edit-btn {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.7rem;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--card-border);
+  background: var(--surface-bg);
+  color: var(--muted-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.rules-card:hover .rules-card-edit-btn {
+  opacity: 1;
 }
 
 .rules-card > span {
@@ -1647,6 +1741,239 @@ ul li {
   color: var(--final-rank-card-muted);
 }
 
+.rules-editor {
+  display: grid;
+  gap: 1rem;
+  border: 1px solid var(--card-border);
+  border-radius: 18px;
+  padding: 1rem;
+  background: var(--card-bg);
+}
+
+.rules-editor label {
+  display: grid;
+  gap: 0.45rem;
+  color: var(--muted-text);
+  font-weight: 800;
+}
+
+.rules-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.55rem;
+}
+
+.rules-editor-title input {
+  max-width: 520px;
+}
+
+.rules-editor-card-list {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.rules-editor-card {
+  display: grid;
+  gap: 0.8rem;
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  padding: 0.85rem;
+  background: var(--surface-bg);
+}
+
+.rules-editor-card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.rules-editor-card-heading strong {
+  color: var(--heading-color);
+}
+
+.rules-editor-card-actions,
+.rules-editor-items,
+.rules-editor-item,
+.rules-variant-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.rules-editor-card-actions button,
+.rules-editor-items button,
+.rules-editor-item button {
+  padding: 0.46rem 0.62rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.rules-order-field {
+  display: inline-flex !important;
+  grid-template-columns: none !important;
+  align-items: center;
+  gap: 0.4rem !important;
+  color: var(--muted-text);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.rules-order-field input {
+  width: 76px;
+  padding: 0.46rem 0.55rem;
+}
+
+.rules-editor-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.rules-variant-picker {
+  align-items: center;
+}
+
+.rules-variant-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  border-radius: 999px;
+  padding: 0.46rem 0.68rem;
+  color: var(--muted-text);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.rules-variant-option-active {
+  border-color: var(--agenda-player);
+  color: var(--heading-color);
+}
+
+.rules-variant-swatch {
+  width: 0.9rem;
+  height: 0.9rem;
+  border: 1px solid var(--card-border);
+  border-radius: 999px;
+}
+
+.rules-swatch-base {
+  background: var(--card-bg);
+}
+
+.rules-swatch-primary {
+  background: var(--agenda-player);
+}
+
+.rules-swatch-gold {
+  background: var(--final-rank-1-border);
+}
+
+.rules-swatch-silver {
+  background: var(--final-rank-2-border);
+}
+
+.rules-editor-items {
+  display: grid;
+}
+
+.rules-editor-items > span {
+  color: var(--muted-text);
+  font-weight: 850;
+}
+
+.rules-editor-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.rules-editor-item textarea {
+  min-height: 74px;
+}
+
+.rules-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 1rem;
+}
+
+.rules-dialog {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 20px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 90dvh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 24px 64px rgba(3, 9, 23, 0.28);
+}
+
+.rules-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.1rem 0.75rem;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.rules-dialog-header h3 {
+  margin: 0;
+}
+
+.rules-dialog-close {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--card-border);
+  background: var(--surface-bg);
+  color: var(--muted-text);
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rules-dialog-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem 1.1rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.rules-dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+  padding: 0.75rem 1.1rem 1rem;
+  border-top: 1px solid var(--card-border);
+}
+
+.rules-dialog-footer-actions {
+  display: flex;
+  gap: 0.55rem;
+  margin-left: auto;
+}
+
+.rules-dialog-delete-btn {
+  border-color: #e55;
+  background: transparent;
+  color: #e55;
+  font-weight: 800;
+}
+
+
+
 .courts-view {
   display: flex;
   flex-direction: column;
@@ -1699,6 +2026,21 @@ ul li {
 
 .courts-grid-row {
   display: contents;
+}
+
+.courts-day-group {
+  display: contents;
+}
+
+.courts-day-heading {
+  grid-column: 1 / -1;
+  margin-top: 0.35rem;
+  border-bottom: 1px solid var(--card-border);
+  padding: 0.35rem 0.1rem 0.45rem;
+  color: var(--heading-color);
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: capitalize;
 }
 
 .courts-grid-header {
@@ -2156,6 +2498,28 @@ ul li {
   background: var(--surface-bg);
 }
 
+.bracket-delete-btn {
+  margin-right: auto;
+  border-color: #e55;
+  background: transparent;
+  color: #e55;
+  font-weight: 800;
+}
+
+.bracket-delete-confirm {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-right: auto;
+}
+
+.bracket-delete-confirm span {
+  font-size: 0.86rem;
+  color: #e55;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .match-editor {
   width: min(680px, 100%);
 }
@@ -2467,6 +2831,24 @@ ul li {
     padding: 0.9rem;
   }
 
+  .rules-heading,
+  .rules-editor-card-heading,
+  .rules-editor-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .rules-edit-button,
+  .rules-editor-actions button,
+  .rules-add-card-button {
+    width: 100%;
+  }
+
+  .rules-editor-fields,
+  .rules-editor-item {
+    grid-template-columns: 1fr;
+  }
+
   .standings-table {
     min-width: 920px;
     table-layout: auto;
@@ -2585,6 +2967,18 @@ ul li {
   .courts-mobile-list {
     display: grid;
     gap: 1rem;
+  }
+
+  .courts-mobile-day {
+    display: grid;
+    gap: 0.7rem;
+  }
+
+  .courts-mobile-day > h3 {
+    margin: 0;
+    color: var(--heading-color);
+    font-size: 0.95rem;
+    text-transform: capitalize;
   }
 
   .courts-mobile-slot {

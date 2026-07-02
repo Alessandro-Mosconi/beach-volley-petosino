@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../utils/supabase';
 
 interface FinalRankingProps {
-  faseName: 'GOLD' | 'SILVER';
+  faseName: string;
   tournamentId: number;
 }
 

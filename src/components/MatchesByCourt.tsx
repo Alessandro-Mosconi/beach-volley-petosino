@@ -16,6 +16,7 @@ interface TeamOption {
 interface PhaseOption {
   codice: string;
   nome: string;
+  tipo: string;
 }
 
 interface GroupOption {
@@ -82,9 +83,27 @@ function formatTime(value: string) {
   });
 }
 
+function formatDay(value: string) {
+  return new Date(value).toLocaleDateString('it-IT', {
+    timeZone: 'Europe/Rome',
+    weekday: 'long',
+    day: '2-digit',
+    month: 'long'
+  });
+}
+
+function dayKey(value: string) {
+  return new Date(value).toLocaleDateString('en-CA', {
+    timeZone: 'Europe/Rome',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+}
+
 function formatRound(match: CourtMatch) {
   if (match.fase_torneo_codice === 'GIRONI' && match.girone_codice) {
-    return match.girone_codice.replace('GIRONE_', 'Girone ');
+    return match.girone_codice.replace(/^.*GIRONE_/, 'Girone ');
   }
   const bracketSlot = BRACKET_SLOT_OPTIONS.find((slot) => slot.value === match.slot_tabellone);
   if (bracketSlot) {
@@ -115,6 +134,10 @@ function formatMatchStatus(status: string) {
     default:
       return status;
   }
+}
+
+function isBracketPhase(phaseCode: string, phases: PhaseOption[]) {
+  return phases.find((phase) => phase.codice === phaseCode)?.tipo === 'ELIMINAZIONE_DIRETTA';
 }
 
 function getSetWins(sets: MatchSet[]) {
@@ -338,7 +361,7 @@ function MatchEditor({
             torneo_id: tournamentId,
             fase_torneo_codice: fase,
             girone_codice: fase === 'GIRONI' ? girone || null : null,
-            slot_tabellone: fase === 'GOLD' || fase === 'SILVER' ? slotTabellone || null : null,
+            slot_tabellone: isBracketPhase(fase, phases) ? slotTabellone || null : null,
             campo_codice: campo,
             orario_inizio: new Date(orario).toISOString(),
             squadra_1_codice: squadra1,
@@ -368,7 +391,7 @@ function MatchEditor({
               ))}
             </select>
           </label>
-          {fase === 'GIRONI' ? (
+          {!isBracketPhase(fase, phases) ? (
             <label>
               Girone
               <select value={girone} onChange={(event) => setGirone(event.target.value)}>
@@ -671,8 +694,9 @@ export default function MatchesByCourt({ tournamentId, canEdit }: MatchesByCourt
           .eq('torneo_id', tournamentId)
           .order('nome', { ascending: true }),
         supabase
-          .from('fase_torneo')
-          .select('codice, nome')
+          .from('v_torneo_fase')
+          .select('codice, nome, tipo, ordine')
+          .eq('torneo_id', tournamentId)
           .order('ordine', { ascending: true }),
         supabase
           .from('girone')
@@ -869,8 +893,8 @@ export default function MatchesByCourt({ tournamentId, canEdit }: MatchesByCourt
       return;
     }
 
-    if ((values.fase_torneo_codice === 'GOLD' || values.fase_torneo_codice === 'SILVER') && !values.slot_tabellone) {
-      setSaveError('Scegli lo slot tabellone per le fasi Gold/Silver.');
+    if (isBracketPhase(values.fase_torneo_codice, phases) && !values.slot_tabellone) {
+      setSaveError('Scegli lo slot tabellone per la fase a eliminazione.');
       setSaving(false);
       return;
     }
@@ -929,6 +953,20 @@ export default function MatchesByCourt({ tournamentId, canEdit }: MatchesByCourt
       lunches: lunches.filter((lunch) => lunch.orario_inizio === time)
     }));
   }, [matches, lunches]);
+
+  const scheduleDays = useMemo(() => {
+    const days = new Map<string, { label: string; rows: typeof scheduleRows }>();
+    scheduleRows.forEach((row) => {
+      const key = dayKey(row.time);
+      const currentDay = days.get(key) ?? { label: formatDay(row.time), rows: [] };
+      currentDay.rows.push(row);
+      days.set(key, currentDay);
+    });
+    return Array.from(days.entries()).map(([key, day]) => ({ key, ...day }));
+  }, [scheduleRows]);
+
+  const hasMultipleScheduleDays = scheduleDays.length > 1;
+  const hasLunches = lunches.length > 0;
 
   if (loading) {
     return (
@@ -1007,70 +1045,82 @@ export default function MatchesByCourt({ tournamentId, canEdit }: MatchesByCourt
         <p className="agenda-empty">Nessuna partita programmata.</p>
       ) : (
         <>
-          <div className="courts-grid" style={{ '--court-count': courts.length + 1 } as React.CSSProperties}>
+          <div className="courts-grid" style={{ '--court-count': courts.length + (hasLunches ? 1 : 0) } as React.CSSProperties}>
             <div className="courts-grid-header courts-grid-time-header">Ora</div>
             {courts.map((court) => (
               <div key={court.codice} className="courts-grid-header">
                 {court.nome}
               </div>
             ))}
-            <div className="courts-grid-header courts-lunch-header">Pranzo</div>
-            {scheduleRows.map((row) => (
-              <div key={row.time} className="courts-grid-row">
-                <div className="courts-time-cell">{formatTime(row.time)}</div>
-                {courts.map((court) => (
-                  <div key={`${row.time}-${court.codice}`} className="courts-match-cell">
-                    {(() => {
-                      const match = row.matchesByCourt.get(court.codice) ?? null;
-                      return (
-                        <MatchCell
-                          match={match}
-                          sets={match ? setsByMatch[match.partita_id] ?? [] : []}
-                          canEdit={canEdit}
-                          onEditResult={setEditingMatch}
-                          onEditMatch={setEditingMatchDetails}
-                        />
-                      );
-                    })()}
+            {hasLunches && <div className="courts-grid-header courts-lunch-header">Pranzo</div>}
+            {scheduleDays.map((day) => (
+              <div key={day.key} className="courts-day-group">
+                {hasMultipleScheduleDays && <div className="courts-day-heading">{day.label}</div>}
+                {day.rows.map((row) => (
+                  <div key={row.time} className="courts-grid-row">
+                    <div className="courts-time-cell">{formatTime(row.time)}</div>
+                    {courts.map((court) => (
+                      <div key={`${row.time}-${court.codice}`} className="courts-match-cell">
+                        {(() => {
+                          const match = row.matchesByCourt.get(court.codice) ?? null;
+                          return (
+                            <MatchCell
+                              match={match}
+                              sets={match ? setsByMatch[match.partita_id] ?? [] : []}
+                              canEdit={canEdit}
+                              onEditResult={setEditingMatch}
+                              onEditMatch={setEditingMatchDetails}
+                            />
+                          );
+                        })()}
+                      </div>
+                    ))}
+                    {hasLunches && (
+                      <div className="courts-match-cell">
+                        <LunchCell lunches={row.lunches} />
+                      </div>
+                    )}
                   </div>
                 ))}
-                <div className="courts-match-cell">
-                  <LunchCell lunches={row.lunches} />
-                </div>
               </div>
             ))}
           </div>
 
           <div className="courts-mobile-list">
-            {scheduleRows.map((row) => (
-              <section key={row.time} className="courts-mobile-slot">
-                <h3>{formatTime(row.time)}</h3>
-                <div className="courts-mobile-cards">
-                  {courts.map((court) => (
-                    <div key={`${row.time}-${court.codice}`} className="courts-mobile-court">
-                      <strong>{court.nome}</strong>
-                      {(() => {
-                        const match = row.matchesByCourt.get(court.codice) ?? null;
-                        return (
-                          <MatchCell
-                            match={match}
-                            sets={match ? setsByMatch[match.partita_id] ?? [] : []}
-                            canEdit={canEdit}
-                            onEditResult={setEditingMatch}
-                            onEditMatch={setEditingMatchDetails}
-                          />
-                        );
-                      })()}
+            {scheduleDays.map((day) => (
+              <div key={day.key} className="courts-mobile-day">
+                {hasMultipleScheduleDays && <h3>{day.label}</h3>}
+                {day.rows.map((row) => (
+                  <section key={row.time} className="courts-mobile-slot">
+                    <h3>{formatTime(row.time)}</h3>
+                    <div className="courts-mobile-cards">
+                      {courts.map((court) => (
+                        <div key={`${row.time}-${court.codice}`} className="courts-mobile-court">
+                          <strong>{court.nome}</strong>
+                          {(() => {
+                            const match = row.matchesByCourt.get(court.codice) ?? null;
+                            return (
+                              <MatchCell
+                                match={match}
+                                sets={match ? setsByMatch[match.partita_id] ?? [] : []}
+                                canEdit={canEdit}
+                                onEditResult={setEditingMatch}
+                                onEditMatch={setEditingMatchDetails}
+                              />
+                            );
+                          })()}
+                        </div>
+                      ))}
+                      {row.lunches.length > 0 && (
+                        <div className="courts-mobile-court">
+                          <strong>Pranzo</strong>
+                          <LunchCell lunches={row.lunches} />
+                        </div>
+                      )}
                     </div>
-                  ))}
-                  {row.lunches.length > 0 && (
-                    <div className="courts-mobile-court">
-                      <strong>Pranzo</strong>
-                      <LunchCell lunches={row.lunches} />
-                    </div>
-                  )}
-                </div>
-              </section>
+                  </section>
+                ))}
+              </div>
             ))}
           </div>
         </>

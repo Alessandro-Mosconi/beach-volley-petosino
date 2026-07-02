@@ -104,6 +104,6 @@ select
     f.nome as fase_nome,
     c.partite_pareggiate
 from classifica_con_scontro_diretto c
-join squadra s on s.codice = c.squadra_codice
-left join girone g on g.codice = c.girone_codice
+join squadra s on s.torneo_id = c.torneo_id and s.codice = c.squadra_codice
+left join girone g on g.torneo_id = c.torneo_id and g.codice = c.girone_codice
 left join fase_torneo f on f.codice = c.fase_torneo_codice;

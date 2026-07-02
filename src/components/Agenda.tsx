@@ -261,6 +261,9 @@ export default function Agenda({ teamId, teams, tournamentId, onTeamChange }: Ag
     });
   };
 
+  const eventDays = new Set(events.map((event) => formatDate(event.orario_inizio)));
+  const hasMultipleEventDays = eventDays.size > 1;
+
   const shouldShowStatus = (event: MatchEvent) =>
     event.role !== 'lunch' && event.status.trim().toLowerCase() !== 'programmata';
 
@@ -344,7 +347,7 @@ export default function Agenda({ teamId, teams, tournamentId, onTeamChange }: Ag
             >
               <div className="agenda-time-block">
                 <strong>{formatTime(e.orario_inizio)}</strong>
-                <span>{formatDate(e.orario_inizio)}</span>
+                {(e.role !== 'lunch' || hasMultipleEventDays) && <span>{formatDate(e.orario_inizio)}</span>}
               </div>
               <div className="agenda-event-body">
                 <div className="agenda-event-header">

@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../utils/supabase';
+import {
+  getFallbackQualificationRules,
+  getQualificationRule,
+  parseQualificationRules,
+  type QualificationRule
+} from '../utils/qualificationRules';
 
 interface Team {
   codice: string;
@@ -63,13 +69,6 @@ interface PhaseOption {
   tipo: string;
 }
 
-function getQualificationTier(position: number | null, gironeCodice: string | null) {
-  if (position === null || !gironeCodice) return null;
-  if (position <= 2) return 'gold';
-  if (position <= 4) return 'silver';
-  return null;
-}
-
 function getMatchOutcome(match: SetBreakdownRow) {
   if (match.set_vinti === match.set_persi) return { label: 'Pareggio', className: 'standings-set-card-draw' };
   if (match.set_vinti > match.set_persi) return { label: 'Vinto', className: 'standings-set-card-won' };
@@ -102,6 +101,7 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
   const [setBreakdown, setSetBreakdown] = useState<SetBreakdownRow[]>([]);
   const [setDetailsByMatchTeam, setSetDetailsByMatchTeam] = useState<Record<string, SetDetailRow[]>>({});
   const [phases, setPhases] = useState<PhaseOption[]>([]);
+  const [qualificationRules, setQualificationRules] = useState<QualificationRule[]>([]);
   const [selectedSetStat, setSelectedSetStat] = useState<StatRow | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const team = teams.find((t) => t.codice === teamId);
@@ -110,7 +110,7 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
     async function fetchStats() {
       setLoading(true);
 
-      const [statsRes, breakdownRes, finalRankingRes, phasesRes] = await Promise.all([
+      const [statsRes, breakdownRes, finalRankingRes, phasesRes, rulesRes] = await Promise.all([
         supabase
           .from('v_classifica_ordinata')
           .select(
@@ -135,18 +135,24 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
         supabase
           .from('v_torneo_fase')
           .select('codice, nome, tipo')
-          .eq('torneo_id', tournamentId)
+          .eq('torneo_id', tournamentId),
+        supabase.from('torneo_regolamento').select('contenuto').eq('torneo_id', tournamentId).maybeSingle()
       ]);
 
       if (statsRes.error || !statsRes.data || breakdownRes.error || finalRankingRes.error || phasesRes.error) {
         setStats([]);
         setSetBreakdown([]);
         setSetDetailsByMatchTeam({});
+        setQualificationRules([]);
         setLoading(false);
         return;
       }
 
       const nextPhases = (phasesRes.data ?? []) as PhaseOption[];
+      const rulesFromRegolamento = rulesRes.error ? [] : parseQualificationRules(rulesRes.data?.contenuto);
+      setQualificationRules(
+        rulesFromRegolamento.length > 0 ? rulesFromRegolamento : getFallbackQualificationRules(nextPhases)
+      );
       const bracketPhaseCodes = new Set(
         nextPhases
           .filter((phase) => phase.tipo === 'ELIMINAZIONE_DIRETTA')
@@ -291,6 +297,11 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
       .on('postgres_changes', { event: '*', schema: 'public', table: 'girone' }, () => fetchStats())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'fase_torneo' }, () => fetchStats())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'torneo_fase' }, () => fetchStats())
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'torneo_regolamento', filter: `torneo_id=eq.${tournamentId}` },
+        () => fetchStats()
+      )
       .subscribe();
 
     return () => {
@@ -371,7 +382,9 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
 
                 <tbody>
                   {stats.map((row, idx) => {
-                    const qualificationTier = getQualificationTier(row.posizione, row.girone_codice);
+                    const qualificationRule = row.girone_codice
+                      ? getQualificationRule(row.posizione, qualificationRules)
+                      : null;
                     const hasSetDetails = row.set_vinti + row.set_persi > 0;
                     const isBracket = isBracketPhase(row.fase_torneo_codice, bracketPhaseCodes);
 
@@ -379,7 +392,7 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
                       <tr
                         key={idx}
                         className={[
-                          qualificationTier ? `standings-row-${qualificationTier}` : '',
+                          qualificationRule ? `standings-row-${qualificationRule.variant}` : '',
                           hasSetDetails ? 'standings-clickable-row' : ''
                         ].filter(Boolean).join(' ') || undefined}
                         tabIndex={hasSetDetails ? 0 : undefined}
@@ -399,9 +412,9 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
                         <td>
                           <span className="team-stats-position">
                             {row.posizione ?? '-'}
-                            {qualificationTier && (
-                              <span className={`standings-qualification standings-qualification-${qualificationTier}`}>
-                                {qualificationTier === 'gold' ? 'Gold' : 'Silver'}
+                            {qualificationRule && (
+                              <span className={`standings-qualification standings-qualification-${qualificationRule.variant}`}>
+                                {qualificationRule.label}
                               </span>
                             )}
                           </span>
@@ -432,7 +445,7 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
 
           <div className="team-stats-mobile-list">
             {stats.map((row, idx) => {
-              const qualificationTier = getQualificationTier(row.posizione, row.girone_codice);
+              const qualificationRule = row.girone_codice ? getQualificationRule(row.posizione, qualificationRules) : null;
               const hasSetDetails = row.set_vinti + row.set_persi > 0;
               const isBracket = isBracketPhase(row.fase_torneo_codice, bracketPhaseCodes);
 
@@ -441,7 +454,7 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
                   key={`${row.fase_nome}-${row.girone_nome ?? 'fase'}-${idx}`}
                   className={[
                     'team-stats-card',
-                    qualificationTier ? `standings-row-${qualificationTier}` : '',
+                    qualificationRule ? `standings-row-${qualificationRule.variant}` : '',
                     hasSetDetails ? 'team-stats-card-clickable' : ''
                   ].filter(Boolean).join(' ')}
                   tabIndex={hasSetDetails ? 0 : undefined}
@@ -460,9 +473,9 @@ export default function TeamStats({ teamId, teams, tournamentId, onTeamChange }:
                     <div className="team-stats-card-title">
                       <span>{row.fase_nome}</span>
                       {!isBracket && row.girone_nome && <strong>{row.girone_nome}</strong>}
-                      {qualificationTier && (
-                        <small className={`standings-qualification standings-qualification-${qualificationTier}`}>
-                          {qualificationTier === 'gold' ? 'Gold' : 'Silver'}
+                      {qualificationRule && (
+                        <small className={`standings-qualification standings-qualification-${qualificationRule.variant}`}>
+                          {qualificationRule.label}
                         </small>
                       )}
                     </div>

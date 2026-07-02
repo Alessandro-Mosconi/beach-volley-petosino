@@ -1126,6 +1126,10 @@ ul li {
   background: var(--final-rank-2-bg);
 }
 
+.standings-row-qualified {
+  background: rgba(34, 197, 94, 0.1);
+}
+
 .standings-qualification {
   flex: 0 0 auto;
   border-radius: 999px;
@@ -1143,6 +1147,11 @@ ul li {
 .standings-qualification-silver {
   background: rgba(148, 163, 184, 0.2);
   color: var(--muted-text);
+}
+
+.standings-qualification-qualified {
+  background: rgba(34, 197, 94, 0.16);
+  color: var(--agenda-lunch);
 }
 
 .standings-set-value {

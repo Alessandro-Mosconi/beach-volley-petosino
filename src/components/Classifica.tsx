@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../utils/supabase';
+import {
+  getFallbackQualificationRules,
+  getQualificationRule,
+  parseQualificationRules,
+  type QualificationRule
+} from '../utils/qualificationRules';
 
 interface ClassificaProps {
   faseName: string; // e.g. 'GIRONI'
@@ -45,11 +51,10 @@ interface SetDetailRow {
   punti_subiti: number;
 }
 
-function getQualificationTier(position: number | null) {
-  if (position === null) return null;
-  if (position <= 2) return 'gold';
-  if (position <= 4) return 'silver';
-  return null;
+interface TournamentPhase {
+  codice: string;
+  nome: string;
+  tipo: string;
 }
 
 function getMatchOutcome(match: SetBreakdownRow) {
@@ -62,6 +67,7 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
   const [rows, setRows] = useState<TeamRow[]>([]);
   const [setBreakdownByTeam, setSetBreakdownByTeam] = useState<Record<string, SetBreakdownRow[]>>({});
   const [setDetailsByMatchTeam, setSetDetailsByMatchTeam] = useState<Record<string, SetDetailRow[]>>({});
+  const [qualificationRules, setQualificationRules] = useState<QualificationRule[]>([]);
   const [selectedSetTeam, setSelectedSetTeam] = useState<TeamRow | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -82,7 +88,7 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
         return;
       }
 
-      const [participantsRes, squadreRes, gironiRes, setBreakdownRes] = await Promise.all([
+      const [participantsRes, squadreRes, gironiRes, setBreakdownRes, phasesRes, rulesRes] = await Promise.all([
         supabase.from('girone_squadra').select('girone_codice, squadra_codice').eq('torneo_id', tournamentId),
         supabase.from('squadra').select('codice, nome').eq('torneo_id', tournamentId),
         supabase.from('girone').select('codice, nome').eq('torneo_id', tournamentId),
@@ -93,15 +99,24 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
           )
           .eq('torneo_id', tournamentId)
           .eq('fase_torneo_codice', faseName)
-          .order('orario_inizio', { ascending: true })
+          .order('orario_inizio', { ascending: true }),
+        supabase.from('v_torneo_fase').select('codice, nome, tipo').eq('torneo_id', tournamentId),
+        supabase.from('torneo_regolamento').select('contenuto').eq('torneo_id', tournamentId).maybeSingle()
       ]);
 
-      if (participantsRes.error || squadreRes.error || gironiRes.error || setBreakdownRes.error) {
+      if (participantsRes.error || squadreRes.error || gironiRes.error || setBreakdownRes.error || phasesRes.error) {
         setRows([]);
         setSetBreakdownByTeam({});
+        setQualificationRules([]);
         setLoading(false);
         return;
       }
+
+      const phases = (phasesRes.data ?? []) as TournamentPhase[];
+      const rulesFromRegolamento = rulesRes.error ? [] : parseQualificationRules(rulesRes.data?.contenuto);
+      setQualificationRules(
+        rulesFromRegolamento.length > 0 ? rulesFromRegolamento : getFallbackQualificationRules(phases)
+      );
 
       const matchIds = Array.from(new Set((setBreakdownRes.data ?? []).map((match) => match.partita_id)));
       const [matchTeamsRes, setDetailsRes] = matchIds.length > 0
@@ -287,6 +302,11 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
         { event: '*', schema: 'public', table: 'squadra' },
         () => fetchData()
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'torneo_regolamento', filter: `torneo_id=eq.${tournamentId}` },
+        () => fetchData()
+      )
       .subscribe();
 
     return () => {
@@ -349,13 +369,13 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
                 </thead>
                 <tbody>
                   {groups[gironeCodice].map((row) => {
-                    const qualificationTier = getQualificationTier(row.posizione);
+                    const qualificationRule = getQualificationRule(row.posizione, qualificationRules);
                     const hasSetDetails = row.set_vinti + row.set_persi > 0;
                     return (
                       <tr
                         key={row.squadra_codice}
                         className={[
-                          qualificationTier ? `standings-row-${qualificationTier}` : '',
+                          qualificationRule ? `standings-row-${qualificationRule.variant}` : '',
                           hasSetDetails ? 'standings-clickable-row' : ''
                         ].filter(Boolean).join(' ') || undefined}
                         tabIndex={hasSetDetails ? 0 : undefined}
@@ -374,9 +394,9 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
                         <td>
                           <div className="standings-team-cell">
                             <span className="standings-team-name">{row.squadra_nome}</span>
-                            {qualificationTier && (
-                              <span className={`standings-qualification standings-qualification-${qualificationTier}`}>
-                                {qualificationTier === 'gold' ? 'Gold' : 'Silver'}
+                            {qualificationRule && (
+                              <span className={`standings-qualification standings-qualification-${qualificationRule.variant}`}>
+                                {qualificationRule.label}
                               </span>
                             )}
                           </div>

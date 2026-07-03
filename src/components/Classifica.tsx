@@ -75,11 +75,12 @@ export default function Classifica({ faseName, tournamentId }: ClassificaProps) 
     async function fetchData() {
       setLoading(true);
       const { data: classificaRows, error } = await supabase
-        .from('v_classifica_gironi')
+        .from('v_classifica_ordinata')
         .select(
           'posizione, squadra_codice, squadra_nome, partite_giocate, partite_vinte, partite_perse, set_vinti, set_persi, punti_fatti, punti_subiti, differenza_punti, punti_classifica, girone_codice, girone_nome'
         )
         .eq('torneo_id', tournamentId)
+        .eq('fase_torneo_codice', faseName)
         .order('girone_codice', { ascending: true })
         .order('posizione', { ascending: true });
       if (error) {

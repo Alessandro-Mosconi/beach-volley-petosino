@@ -10,7 +10,7 @@
 -- - vincitore salvabile su partita e su ogni set
 -- - pranzo incluso nella view agenda
 -- - qualificazione_fase semplificata: contiene solo fase + squadra
--- - view dedicate per classifiche gironi, Gold e Silver
+-- - classifiche filtrabili da v_classifica_ordinata
 -- =====================================================
 
 -- =====================================================
@@ -45,6 +45,7 @@ drop function if exists puo_modificare_risultati_set(integer) cascade;
 drop function if exists trg_squadra_codice_default_fn() cascade;
 drop function if exists trg_torneo_regolamento_updated_at_fn() cascade;
 drop function if exists trg_torneo_visibile_unico_fn() cascade;
+drop function if exists calcola_punti_classifica_partita(integer, text, text, integer, integer, integer) cascade;
 drop function if exists normalizza_codice(text) cascade;
 
 drop table if exists qualificazione_fase cascade;
@@ -55,6 +56,7 @@ drop table if exists torneo_operatore cascade;
 drop table if exists girone_squadra cascade;
 drop table if exists squadra cascade;
 drop table if exists girone cascade;
+drop table if exists torneo_punteggio_regola cascade;
 drop table if exists torneo_fase cascade;
 drop table if exists fase_torneo cascade;
 drop table if exists campo cascade;
@@ -229,6 +231,23 @@ select
 from torneo_fase tf
 join fase_torneo ft on ft.codice = tf.fase_torneo_codice
 where tf.visibile = true;
+
+create table torneo_punteggio_regola (
+    torneo_id integer not null,
+    fase_torneo_codice text not null,
+    set_vinti_squadra_a integer not null,
+    set_vinti_squadra_b integer not null,
+    punti_squadra_a integer not null,
+    punti_squadra_b integer not null,
+    primary key (torneo_id, fase_torneo_codice, set_vinti_squadra_a, set_vinti_squadra_b),
+    foreign key (torneo_id, fase_torneo_codice) references torneo_fase(torneo_id, fase_torneo_codice) on delete cascade,
+    constraint chk_torneo_punteggio_regola_set_a check (set_vinti_squadra_a >= 0),
+    constraint chk_torneo_punteggio_regola_set_b check (set_vinti_squadra_b >= 0),
+    constraint chk_torneo_punteggio_regola_punti_a check (punti_squadra_a >= 0),
+    constraint chk_torneo_punteggio_regola_punti_b check (punti_squadra_b >= 0),
+    constraint chk_torneo_punteggio_regola_set_uguali_punti_uguali
+        check (set_vinti_squadra_a <> set_vinti_squadra_b or punti_squadra_a = punti_squadra_b)
+);
 
 -- =====================================================
 -- GIRONE
@@ -707,6 +726,65 @@ select
 from v_partita_risultato r;
 
 -- =====================================================
+-- FUNZIONE PUNTI CLASSIFICA
+-- Legge eventuali regole per torneo da torneo_punteggio_regola.
+-- Default storico:
+-- - GIRONI: punti = set vinti
+-- - altre fasi: 3 punti per partita vinta
+-- =====================================================
+
+create or replace function calcola_punti_classifica_partita(
+    p_torneo_id integer,
+    p_fase_torneo_codice text,
+    p_risultato_squadra text,
+    p_set_vinti integer,
+    p_set_persi integer,
+    p_partita_vinta integer
+) returns integer
+language plpgsql
+stable
+as $$
+declare
+    v_punti integer;
+begin
+    if coalesce(p_set_vinti, 0) + coalesce(p_set_persi, 0) = 0
+       and p_risultato_squadra not in ('VINTA', 'PERSA') then
+        return 0;
+    end if;
+
+    select r.punti_squadra_a
+    into v_punti
+    from torneo_punteggio_regola r
+    where r.torneo_id = p_torneo_id
+      and r.fase_torneo_codice = p_fase_torneo_codice
+      and r.set_vinti_squadra_a = coalesce(p_set_vinti, 0)
+      and r.set_vinti_squadra_b = coalesce(p_set_persi, 0);
+
+    if found then
+        return v_punti;
+    end if;
+
+    select r.punti_squadra_b
+    into v_punti
+    from torneo_punteggio_regola r
+    where r.torneo_id = p_torneo_id
+      and r.fase_torneo_codice = p_fase_torneo_codice
+      and r.set_vinti_squadra_a = coalesce(p_set_persi, 0)
+      and r.set_vinti_squadra_b = coalesce(p_set_vinti, 0);
+
+    if found then
+        return v_punti;
+    end if;
+
+    if p_fase_torneo_codice = 'GIRONI' then
+        return coalesce(p_set_vinti, 0);
+    end if;
+
+    return coalesce(p_partita_vinta, 0) * 3;
+end;
+$$;
+
+-- =====================================================
 -- VIEW CLASSIFICA
 -- Non esiste tabella classifica: tutto viene computato.
 -- =====================================================
@@ -730,10 +808,14 @@ select
     coalesce(sum(ps.punti_subiti), 0)::integer as punti_subiti,
     (coalesce(sum(ps.set_vinti), 0) - coalesce(sum(ps.set_persi), 0))::integer as differenza_set,
     (coalesce(sum(ps.punti_fatti), 0) - coalesce(sum(ps.punti_subiti), 0))::integer as differenza_punti,
-    case
-        when ps.fase_torneo_codice = 'GIRONI' then coalesce(sum(ps.set_vinti), 0)::integer
-        else (coalesce(sum(ps.partita_vinta), 0) * 3)::integer
-    end as punti_classifica
+    coalesce(sum(calcola_punti_classifica_partita(
+        ps.torneo_id,
+        ps.fase_torneo_codice,
+        ps.risultato_squadra,
+        ps.set_vinti,
+        ps.set_persi,
+        ps.partita_vinta
+    )), 0)::integer as punti_classifica
 from v_partita_squadra ps
 where ps.risultato_squadra in ('VINTA', 'PERSA')
    or ps.set_vinti + ps.set_persi > 0
@@ -810,54 +892,6 @@ from classifica_con_scontro_diretto c
 join squadra s on s.torneo_id = c.torneo_id and s.codice = c.squadra_codice
 left join girone g on g.torneo_id = c.torneo_id and g.codice = c.girone_codice
 left join fase_torneo f on f.codice = c.fase_torneo_codice;
-
--- =====================================================
--- VIEW CLASSIFICHE SPECIFICHE
--- Comode per il frontend: puoi leggere direttamente
--- la classifica richiesta senza filtrare ogni volta.
--- =====================================================
-
-create or replace view v_classifica_gironi as
-select *
-from v_classifica_ordinata
-where fase_torneo_codice = 'GIRONI'
-order by girone_codice, posizione;
-
-create or replace view v_classifica_girone_a as
-select *
-from v_classifica_gironi
-where girone_codice = 'GIRONE_A'
-order by posizione;
-
-create or replace view v_classifica_girone_b as
-select *
-from v_classifica_gironi
-where girone_codice = 'GIRONE_B'
-order by posizione;
-
-create or replace view v_classifica_girone_c as
-select *
-from v_classifica_gironi
-where girone_codice = 'GIRONE_C'
-order by posizione;
-
-create or replace view v_classifica_girone_d as
-select *
-from v_classifica_gironi
-where girone_codice = 'GIRONE_D'
-order by posizione;
-
-create or replace view v_classifica_gold as
-select *
-from v_classifica_ordinata
-where fase_torneo_codice = 'GOLD'
-order by posizione;
-
-create or replace view v_classifica_silver as
-select *
-from v_classifica_ordinata
-where fase_torneo_codice = 'SILVER'
-order by posizione;
 
 -- =====================================================
 -- VIEW CLASSIFICA FINALE TABELLONI
@@ -945,18 +979,6 @@ join finali f
     on f.torneo_id = ff.torneo_id
    and f.fase_torneo_codice = ff.fase_torneo_codice
 order by torneo_id, fase_torneo_codice, posizione;
-
-create or replace view v_classifica_finale_gold as
-select *
-from v_classifica_finale
-where fase_torneo_codice = 'GOLD'
-order by torneo_id, posizione;
-
-create or replace view v_classifica_finale_silver as
-select *
-from v_classifica_finale
-where fase_torneo_codice = 'SILVER'
-order by torneo_id, posizione;
 
 -- =====================================================
 -- VIEW AGENDA SQUADRA
@@ -1103,6 +1125,7 @@ alter table torneo_regolamento enable row level security;
 alter table campo enable row level security;
 alter table fase_torneo enable row level security;
 alter table torneo_fase enable row level security;
+alter table torneo_punteggio_regola enable row level security;
 alter table girone enable row level security;
 alter table squadra enable row level security;
 alter table girone_squadra enable row level security;
@@ -1116,6 +1139,7 @@ create policy public_read_torneo_regolamento on torneo_regolamento for select to
 create policy public_read_campo on campo for select to anon, authenticated using (true);
 create policy public_read_fase_torneo on fase_torneo for select to anon, authenticated using (true);
 create policy public_read_torneo_fase on torneo_fase for select to anon, authenticated using (true);
+create policy public_read_torneo_punteggio_regola on torneo_punteggio_regola for select to anon, authenticated using (true);
 create policy public_read_girone on girone for select to anon, authenticated using (true);
 create policy public_read_squadra on squadra for select to anon, authenticated using (true);
 create policy public_read_girone_squadra on girone_squadra for select to anon, authenticated using (true);
@@ -1155,26 +1179,28 @@ with check (puo_modificare_risultati());
 create policy operator_delete_torneo_regolamento on torneo_regolamento for delete to authenticated
 using (puo_modificare_risultati());
 
+create policy operator_insert_torneo_punteggio_regola on torneo_punteggio_regola for insert to authenticated
+with check (puo_modificare_risultati());
+
+create policy operator_update_torneo_punteggio_regola on torneo_punteggio_regola for update to authenticated
+using (puo_modificare_risultati())
+with check (puo_modificare_risultati());
+
+create policy operator_delete_torneo_punteggio_regola on torneo_punteggio_regola for delete to authenticated
+using (puo_modificare_risultati());
+
 grant usage on schema public to anon, authenticated;
 grant select on all tables in schema public to anon, authenticated;
-grant insert, update, delete on partita, partita_set, torneo_regolamento to authenticated;
+grant insert, update, delete on partita, partita_set, torneo_regolamento, torneo_punteggio_regola to authenticated;
 grant usage, select on sequence partita_id_seq, partita_set_id_seq to authenticated;
+grant execute on function calcola_punti_classifica_partita(integer, text, text, integer, integer, integer) to anon, authenticated;
 grant select on
     v_torneo_fase,
     v_partita_risultato,
     v_partita_squadra,
     v_classifica,
     v_classifica_ordinata,
-    v_classifica_gironi,
-    v_classifica_girone_a,
-    v_classifica_girone_b,
-    v_classifica_girone_c,
-    v_classifica_girone_d,
-    v_classifica_gold,
-    v_classifica_silver,
     v_classifica_finale,
-    v_classifica_finale_gold,
-    v_classifica_finale_silver,
     v_agenda_squadra
 to anon, authenticated;
 
@@ -1188,6 +1214,7 @@ do $$ begin alter publication supabase_realtime add table torneo_regolamento; ex
 do $$ begin alter publication supabase_realtime add table campo; exception when duplicate_object then null; end $$;
 do $$ begin alter publication supabase_realtime add table fase_torneo; exception when duplicate_object then null; end $$;
 do $$ begin alter publication supabase_realtime add table torneo_fase; exception when duplicate_object then null; end $$;
+do $$ begin alter publication supabase_realtime add table torneo_punteggio_regola; exception when duplicate_object then null; end $$;
 do $$ begin alter publication supabase_realtime add table girone; exception when duplicate_object then null; end $$;
 do $$ begin alter publication supabase_realtime add table squadra; exception when duplicate_object then null; end $$;
 do $$ begin alter publication supabase_realtime add table girone_squadra; exception when duplicate_object then null; end $$;
